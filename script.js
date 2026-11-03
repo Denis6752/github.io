@@ -178,7 +178,7 @@ const CLOUD_KEY=window.OFFICESPACE_SUPABASE_ANON_KEY;
 function cloudError(err){return (err&&err.message)||'Не удалось выполнить запрос к облачной базе'}
 async function cloudFetch(){
  const [pr,wr,br,mr,sr,privacyResult,mutesResult,dndResult]=await Promise.all([
-  sb.from('profiles').select('id,full_name,department,phone,role').order('full_name'),
+  sb.from('profiles').select('id,full_name,department,phone,role,email').order('full_name'),
   sb.from('workplaces').select('*').eq('is_active',true).order('id'),
   sb.from('bookings').select('*').order('booking_date'),
   sb.from('office_messages').select('*').order('created_at',{ascending:false}).limit(500),
