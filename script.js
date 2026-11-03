@@ -188,7 +188,7 @@ async function cloudFetch(){
   sb.from('message_dnd').select('until_at').eq('user_id',cloudUser.id).maybeSingle()
  ]);
  for(const x of [pr,wr,br,mr,sr,privacyResult,mutesResult,dndResult])if(x.error)throw x.error;
- DB={users:(pr.data||[]).map(x=>({id:x.id,name:x.full_name||'Сотрудник',dep:x.department||'—',phone:x.phone||'',email:x.id===cloudUser.id?(cloudUser.email||''):'',role:x.role})),
+ DB={users:(pr.data||[]).map(x=>({id:x.id,name:x.full_name||'Сотрудник',dep:x.department||'—',phone:x.phone||'',email:x.email||(x.id===cloudUser.id?(cloudUser.email||''):''),role:x.role})),
   blocked:(wr.data||[]).filter(x=>x.is_blocked).map(x=>x.id),
   bk:(br.data||[]).map(x=>({id:x.id,uid:x.user_id,pid:x.workplace_id,d:x.booking_date,s:x.start_minute,e:x.end_minute,st:x.status})),
   dndUntil:dndResult.data?.until_at||null,privacy:privacyResult.data||[],myPrivacy:(privacyResult.data||[]).find(x=>x.user_id===cloudUser.id)?.mode||'all',mutes:mutesResult.data||[],nt:[],log:[],msgs:(mr.data||[]).map(x=>({id:x.id,from:x.sender_id,to:x.recipient_id,type:x.message_type,subj:x.subject,text:x.body,at:new Date(x.created_at).getTime(),r:x.is_read})),mid:0,cfg:{min:sr.data?.min_duration_minutes||30,hor:sr.data?.booking_horizon_days||14,ns:sr.data?.no_show_grace_minutes||30},id:1,pe:{},pn:[],pid:200};
