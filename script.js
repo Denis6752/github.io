@@ -162,11 +162,14 @@ function muteManagement(){if(rk()<1)return '';const esc=v=>String(v??'').replace
 
 function render(){buildP();sweep();if(!S.uid)return loginView();fixT();const u=DB.users.find(x=>x.id==S.uid),R=RK[u.role],um=(DB.msgs||[]).filter(m=>m.to==S.uid&&!m.r).length,base=[['map','🗺 Карта'],['search','🔎 Поиск'],['mine','🧾 Мои брони']],tabs=R==0?[...base,['msg','💬 Сообщения'+(um?' ('+um+')':'')]]:[...base,['all','📋 Все брони'],['stats','📊 Аналитика'],['staff','👥 Сотрудники'],['msg','💬 Сообщения'+(um?' ('+um+')':'')],...(R>1?[['sys','⚙️ Система']]:[])];
  if(!tabs.some(t=>t[0]==S.v)&&S.v!='acc')S.v='map';const mine=DB.nt.filter(n=>n.u==S.uid),un=mine.filter(n=>!n.r).length;
+ const staffDraft=S.v==='staff'?Object.fromEntries(['un','ud','ue','up','upw','ur','muteReason','muteUser','muteDuration'].map(id=>{const el=document.getElementById(id);return [id,el?el.value:null]})):null;
  $('#app').innerHTML=`<header><div class="logo">🏢 OfficeSpace<small>интеллектуальное управление рабочими пространствами</small></div><nav>${tabs.map(t=>`<button class="${S.v==t[0]?'on':''}" data-a="tab" data-i="${t[0]}">${t[1]}</button>`).join('')}</nav>
  <div class="hr"><span style="font-size:12px${off?';background:rgba(245,158,11,.25);color:#fbbf24':''}">${off?'🧪 Демо-время':'🕐 Сейчас'}: ${new Date(now()).toLocaleString('ru-RU',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</span><button class="hb" data-a="t1" title="Сдвинуть часы сайта на 1 час вперёд (демо)">+1 ч</button><button class="hb" data-a="t24" title="Сдвинуть часы сайта на 1 день вперёд (демо)">+1 д</button><button class="hb" data-a="t0" title="Вернуть реальное время и данные">${off?'↺ Сброс':'Сброс'}</button><button class="hb" data-a="help">❓ Зачем «машина времени»?</button>
  <button class="hb" data-a="bell">🔔${un?`<span class="dot">${un}</span>`:''}</button>${S.nt?`<div class="nt">${mine.slice(0,14).map(n=>`<p class="${n.r?'':'u'}" data-a="nt" data-i="${DB.nt.indexOf(n)}" title="Нажмите, чтобы открыть">${n.t}<br><small class="mu">${new Date(n.at).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small></p>`).join('')||'<p>Уведомлений нет</p>'}</div>`:''}
  <span class="hb" style="cursor:default;background:rgba(255,255,255,.3)">${dndActive()?'🌙 Не беспокоить · ':''}${RN[u.role]}</span><button class="hb" data-a="tab" data-i="acc" title="Настройки аккаунта">👤 ${u.name}</button><button class="hb" data-a="logout">Выйти</button><button class="hb" data-a="theme">🌓</button></div></header>
- <main>${pageHead()}${{map:vMap,search:vSearch,mine:vMine,all:vAll,stats:vStats,staff:vStaff,sys:vSys,msg:vMsg,acc:vAcc}[S.v]()}<p class="mu" style="text-align:center;margin-top:20px">Облачная версия OfficeSpace · Бронирования и сообщения синхронизируются через Supabase ${rk()>1?'· <a href="#" data-a="reset" style="color:inherit">сбросить данные (ИТ)</a>':''}</p></main>${modal()}`}
+ <main>${pageHead()}${{map:vMap,search:vSearch,mine:vMine,all:vAll,stats:vStats,staff:vStaff,sys:vSys,msg:vMsg,acc:vAcc}[S.v]()}<p class="mu" style="text-align:center;margin-top:20px">Облачная версия OfficeSpace · Бронирования и сообщения синхронизируются через Supabase ${rk()>1?'· <a href="#" data-a="reset" style="color:inherit">сбросить данные (ИТ)</a>':''}</p></main>${modal()}`;
+ if(staffDraft)for(const [id,value] of Object.entries(staffDraft)){const el=document.getElementById(id);if(el&&value!==null)el.value=value}
+}
 
 // ===== Supabase cloud integration =====
 let sb=null, cloudUser=null, cloudChannel=null, cloudBusy=false, cloudPending=false, cloudRetry=null, cloudStatus="", knownMessageIds=null;
@@ -200,7 +203,7 @@ async function cloudFetch(){
  }
  knownMessageIds=current;
 }
-function cloudEditing(){const a=document.activeElement;return S.v==='msg'&&a&&['INPUT','TEXTAREA','SELECT'].includes(a.tagName)&&a.closest('#app')}
+function cloudEditing(){const a=document.activeElement;return !!(a&&['INPUT','TEXTAREA','SELECT'].includes(a.tagName)&&a.closest('#app'))}
 async function cloudRefresh(){
  if(!sb||!cloudUser)return;
  if(cloudBusy){cloudPending=true;return}
