@@ -263,7 +263,7 @@ async function cloudCreateUser(){
  const btn=document.querySelector('[data-a="adduser"]');if(btn){btn.disabled=true;btn.textContent='Создаём аккаунт…'}
  try{
   const {data:{session}}=await sb.auth.getSession();if(!session?.access_token)throw new Error('Сессия истекла. Войдите снова.');
-  const response=await fetch('/.netlify/functions/create-user',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({name,department,email,phone,password,role})});
+  const response=await fetch(CLOUD_URL.replace(/\/$/,'')+'/functions/v1/create-user',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token,'apikey':CLOUD_KEY},body:JSON.stringify({name,department,email,phone,password,role})});
   const result=await response.json().catch(()=>({error:'Сервер вернул некорректный ответ'}));if(!response.ok)throw new Error(result.error||'Не удалось создать аккаунт');
   await cloudFetch();render();toast('Аккаунт создан: '+email+' — сотрудник может войти с указанным паролем');
  }catch(e){toast('Не удалось создать аккаунт: '+cloudError(e),1);if(btn){btn.disabled=false;btn.textContent='Создать аккаунт'}}
