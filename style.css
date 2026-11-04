@@ -1219,3 +1219,22 @@ input[type="date"]{min-width:235px!important;min-height:55px!important;font-size
 .os-staff-picture img,.thread-avatar img,.os-profile-avatar img,.os-top-avatar img{width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit}
 .thread-avatar{overflow:hidden}
 .os-photo-upload-status{line-height:1.4}
+
+/* OfficeSpace 5.9.2 — красивое подтверждение удаления сообщения */
+body.os-delete-dialog-open{overflow:hidden}
+.os-delete-dialog-overlay{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(6,9,24,.7);-webkit-backdrop-filter:blur(9px);backdrop-filter:blur(9px);animation:os-delete-fade .18s ease-out}
+.os-delete-dialog{box-sizing:border-box;width:min(440px,100%);padding:30px 28px 26px;border:1px solid rgba(149,127,255,.28);border-radius:24px;background:linear-gradient(160deg,#22284f,#151a35 86%);box-shadow:0 28px 90px rgba(0,0,0,.50),inset 0 1px 0 rgba(255,255,255,.07);color:#fff;text-align:center;animation:os-delete-pop .2s ease-out}
+.os-delete-dialog-icon{width:68px;height:68px;margin:0 auto 20px;display:grid;place-items:center;color:#ff829b;background:rgba(251,91,125,.12);border:1px solid rgba(251,91,125,.25);border-radius:20px}
+.os-delete-dialog h2{margin:0 0 12px;font-size:clamp(21px,4vw,27px);line-height:1.2;font-weight:800;letter-spacing:-.025em;color:#fff}
+.os-delete-dialog p{margin:0 0 26px;color:#c5c9df;font-size:15px;line-height:1.6}
+.os-delete-dialog-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.os-delete-dialog-actions button{min-height:49px;padding:10px 12px;border:0;border-radius:13px;color:white;font:inherit;font-size:14px;font-weight:750;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
+.os-delete-dialog-actions button:hover{transform:translateY(-2px);filter:brightness(1.06)}
+.os-delete-dialog-actions button:active{transform:translateY(0)}
+.os-delete-dialog-actions button:focus-visible{outline:3px solid #c4b5fd;outline-offset:3px}
+.os-delete-dialog-cancel{background:#343b60}
+.os-delete-dialog-confirm{background:linear-gradient(135deg,#fa6181,#e43d64);box-shadow:0 10px 26px rgba(228,61,100,.22)}
+@keyframes os-delete-fade{from{opacity:0}to{opacity:1}}
+@keyframes os-delete-pop{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:420px){.os-delete-dialog{padding:26px 20px 22px}.os-delete-dialog-actions{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.os-delete-dialog-overlay,.os-delete-dialog{animation:none}.os-delete-dialog-actions button{transition:none}}

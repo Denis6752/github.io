@@ -768,12 +768,64 @@ async function cloudSendMessage(){
  if(error){if(btn)btn.disabled=false;return toast('Не удалось отправить: '+cloudError(error),1)}
  S.rp=null;await cloudFetch();render();toast('Сообщение отправлено');
 }
+// Кастомное подтверждение удаления вместо браузерного confirm().
+function osConfirmHideMessage(){
+ return new Promise(resolve=>{
+  const previous=document.querySelector('.os-delete-dialog-overlay');
+  if(previous)previous.remove();
+  const backdrop=document.createElement('div');
+  backdrop.className='os-delete-dialog-overlay';
+  backdrop.innerHTML=`
+   <section class="os-delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="os-delete-dialog-title" aria-describedby="os-delete-dialog-desc">
+    <div class="os-delete-dialog-icon" aria-hidden="true">
+     <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg>
+    </div>
+    <h2 id="os-delete-dialog-title">Удалить сообщение?</h2>
+    <p id="os-delete-dialog-desc">Сообщение исчезнет у вас на всех устройствах. У собеседника оно сохранится.</p>
+    <div class="os-delete-dialog-actions">
+     <button type="button" class="os-delete-dialog-cancel">Оставить</button>
+     <button type="button" class="os-delete-dialog-confirm">Удалить у себя</button>
+    </div>
+   </section>`;
+  const previousFocus=document.activeElement;
+  const cancel=backdrop.querySelector('.os-delete-dialog-cancel');
+  const confirmButton=backdrop.querySelector('.os-delete-dialog-confirm');
+  const alreadyLocked=document.body.classList.contains('os-delete-dialog-open');
+  document.body.classList.add('os-delete-dialog-open');
+  document.body.appendChild(backdrop);
+  let settled=false;
+  const finish=(result)=>{
+   if(settled)return;
+   settled=true;
+   document.removeEventListener('keydown',onKeydown,true);
+   backdrop.remove();
+   if(!alreadyLocked)document.body.classList.remove('os-delete-dialog-open');
+   if(previousFocus?.isConnected&&typeof previousFocus.focus==='function')previousFocus.focus();
+   resolve(result);
+  };
+  function onKeydown(event){
+   if(event.key==='Escape'){event.preventDefault();event.stopPropagation();finish(false)}
+   if(event.key==='Tab'){
+    const controls=[cancel,confirmButton];
+    const index=controls.indexOf(document.activeElement);
+    if(event.shiftKey&&index<=0){event.preventDefault();confirmButton.focus()}
+    else if(!event.shiftKey&&index===controls.length-1){event.preventDefault();cancel.focus()}
+   }
+  }
+  cancel.addEventListener('click',()=>finish(false));
+  confirmButton.addEventListener('click',()=>finish(true));
+  backdrop.addEventListener('click',event=>{if(event.target===backdrop)finish(false)});
+  document.addEventListener('keydown',onKeydown,true);
+  cancel.focus();
+ });
+}
+
 // "Удалить у себя" is a per-user tombstone. The original message is kept for the other party.
 async function cloudHideMessage(id,button){
  if(!cloudUser)return toast('Войдите в аккаунт',1);
  const message=DB.msgs.find(x=>String(x.id)===String(id));
  if(!message||![message.from,message.to].includes(cloudUser.id))return toast('Сообщение не найдено',1);
- if(!confirm('Удалить это сообщение у себя на всех устройствах? У собеседника оно сохранится.'))return;
+ if(!await osConfirmHideMessage())return;
  if(button?.disabled)return;
  if(button)button.disabled=true;
  try{
