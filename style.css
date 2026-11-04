@@ -1206,3 +1206,9 @@ input[type="date"]{min-width:235px!important;min-height:55px!important;font-size
 .os-search-fields>label{min-width:0}
 @media(max-width:1000px){.os-search-fields{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 @media(max-width:760px){.os-search-fields{grid-template-columns:1fr!important}}
+
+/* OfficeSpace 5.7 — department editing through protected Supabase RPC */
+.os-dept-editor{display:flex;align-items:center;gap:8px;min-width:230px}
+.os-dept-editor input{flex:1;min-width:120px;max-width:240px;border-radius:9px;padding:10px 11px;font-size:13px}
+.os-dept-editor .btn{white-space:nowrap;border-radius:9px;min-height:40px;padding:9px 13px}
+@media(max-width:780px){.os-dept-editor{min-width:190px;flex-wrap:wrap}.os-dept-editor input{max-width:none;width:100%}.os-dept-editor .btn{width:100%}}
