@@ -473,7 +473,7 @@ async function cloudSubscribe(){
   .on('postgres_changes',{event:'*',schema:'public',table:'workplaces'},()=>cloudRefresh())
   .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},()=>cloudRefresh())
   .on('postgres_changes',{event:'*',schema:'public',table:'office_messages'},()=>cloudRefresh())
-  .on('postgres_changes',{event:'INSERT',schema:'public',table:'message_hidden',filter:'user_id=eq.'+cloudUser.id},()=>cloudRefresh())
+  .on('postgres_changes',{event:'INSERT',schema:'public',table:'message_hidden',filter:'user_id=eq.'+cloudUser.id},()=>osSyncHiddenMessages())
   .on('postgres_changes',{event:'*',schema:'public',table:'message_mutes'},()=>cloudRefresh())
   .on('postgres_changes',{event:'*',schema:'public',table:'message_privacy'},()=>cloudRefresh())
   .on('postgres_changes',{event:'*',schema:'public',table:'message_dnd'},()=>cloudRefresh())
@@ -487,6 +487,33 @@ async function cloudSubscribe(){
    }
   });
 }
+// 5.9.1: independent lightweight synchronization of per-user message hides.
+// Realtime remains the primary mechanism; this check recovers missed INSERT events.
+let osHiddenSyncBusy=false;
+async function osSyncHiddenMessages(){
+ if(osHiddenSyncBusy||!sb||!cloudUser||!DB||S.uid!==cloudUser.id)return;
+ osHiddenSyncBusy=true;
+ const owner=cloudUser.id;
+ try{
+  const {data,error}=await sb.from('message_hidden').select('message_id').eq('user_id',owner);
+  if(error)throw error;
+  if(!cloudUser||cloudUser.id!==owner||S.uid!==owner)return;
+  const latest=[...new Set((data||[]).map(row=>String(row.message_id)))];
+  const previous=new Set((DB.hiddenMessageIds||[]).map(String));
+  const changed=latest.length!==previous.size||latest.some(id=>!previous.has(id));
+  if(!changed)return;
+  DB.hiddenMessageIds=latest;
+  if(S.mo!==null&&latest.includes(String(S.mo)))S.mo=null;
+  if(!cloudEditing()&&!S.m)render();
+  else cloudPending=true;
+  console.info('[OfficeSpace] Hidden messages synced:',latest.length);
+ }catch(error){console.warn('[OfficeSpace] Hidden message sync:',cloudError(error))}
+ finally{osHiddenSyncBusy=false}
+}
+// Only the small hidden-ID list is checked, not all bookings or messages.
+setInterval(()=>{if(!document.hidden)osSyncHiddenMessages()},6000);
+window.addEventListener('focus',()=>osSyncHiddenMessages());
+
 document.addEventListener('focusout',()=>{if(cloudPending)setTimeout(()=>cloudRefresh(),100)});
 window.addEventListener('online',()=>{if(cloudUser){cloudSubscribe();cloudRefresh()}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&cloudUser)cloudRefresh()});
@@ -752,6 +779,10 @@ async function cloudHideMessage(id,button){
  try{
   const {error}=await sb.from('message_hidden').upsert({user_id:cloudUser.id,message_id:String(id)},{onConflict:'user_id,message_id',ignoreDuplicates:true});
   if(error)throw error;
+  const {data:verified,error:verifyError}=await sb.from('message_hidden')
+   .select('message_id').eq('user_id',cloudUser.id).eq('message_id',String(id)).maybeSingle();
+  if(verifyError)throw verifyError;
+  if(!verified)throw new Error('Скрытие не найдено в Supabase после сохранения');
   DB.hiddenMessageIds=[...new Set([...(DB.hiddenMessageIds||[]),String(id)])];
   if(String(S.mo)===String(id))S.mo=null;
   render();
