@@ -117,7 +117,42 @@ function ctrlOld(dateOnly){return`<div class="card ctrl"><label>Дата<input t
 // Local UI preferences; no Supabase schema changes.
 const osLocalKey=(suffix)=>'os_ui_'+suffix+'_'+String(S.uid||'guest');
 const osHiddenMessages=()=>{try{return JSON.parse(localStorage.getItem(osLocalKey('hidden'))||'[]')}catch(e){return []}};
-const osAvatar=()=>{try{return localStorage.getItem(osLocalKey('avatar'))||''}catch(e){return ''}};
+// The cloud profile is the source of truth. Legacy browser avatars are only a fallback
+// until the user explicitly reselects one or uploads a photo.
+const osAvatarBucket='officespace-avatars';
+const osAvatarLinks=new Map();
+const osAttr=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const osAvatarLegacy=()=>{try{return localStorage.getItem(osLocalKey('avatar'))||''}catch(e){return ''}};
+const osAvatarForUser=id=>{
+ const user=DB?.users?.find(u=>u.id===id);
+ if(user){
+  if(user.avatarPreset!==null&&Number.isInteger(user.avatarPreset)&&user.avatarPreset>=0&&user.avatarPreset<osDevAvatarThemes.length)return osDevAvatarSvg(user.avatarPreset);
+  if(user.avatarPath)return osAvatarLinks.get(user.avatarPath)?.url||'';
+  if(id===S.uid)return osAvatarLegacy();
+ }
+ return '';
+};
+const osAvatar=()=>osAvatarForUser(S.uid);
+async function osRefreshAvatarLinks(users){
+ const now=Date.now();
+ const paths=[...new Set(users.map(u=>u.avatarPath).filter(Boolean))];
+ for(const path of paths){
+  if(osAvatarLinks.get(path)?.expires>now)continue;
+  const {data,error}=await sb.storage.from(osAvatarBucket).createSignedUrl(path,3600);
+  if(error){console.warn('[OfficeSpace] Не удалось загрузить аватар',error.message);continue}
+  osAvatarLinks.set(path,{url:data.signedUrl,expires:Date.now()+45*60*1000});
+ }
+ for(const path of [...osAvatarLinks.keys()])if(!paths.includes(path))osAvatarLinks.delete(path);
+}
+async function osSaveAvatarProfile(changes,success){
+ if(!sb||!cloudUser)return toast('Войдите в аккаунт',1);
+ const {error}=await sb.from('profiles').update(changes).eq('id',cloudUser.id);
+ if(error)return toast('Аватар не сохранён: '+cloudError(error),1);
+ try{localStorage.removeItem(osLocalKey('avatar'))}catch(e){}
+ await cloudFetch();render();toast(success);
+ return true;
+}
+
 const osDevAvatarThemes=[
  ['#d8e8ff','#718fe9','#f2ba8b','#29243c','#4059b7',0,0],
  ['#e2d7ff','#9b7eea','#d99b72','#332742','#673db5',1,0],
@@ -145,7 +180,7 @@ const osDevAvatarSvg=n=>{
  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" rx="24" fill="${bg}"/><circle cx="112" cy="23" r="28" fill="${accent}" opacity=".23"/><path d="M-10 116Q30 103 57 110Q102 119 141 95V140H-10Z" fill="${accent}" opacity=".26"/><path d="M17 128Q19 95 49 93H78Q110 93 113 128" fill="${shirt}"/><path d="M47 95L64 115L81 95" fill="none" stroke="#fff" stroke-width="3" opacity=".45"/><rect x="57" y="81" width="15" height="18" rx="6" fill="${skin}"/>${hairBack}<ellipse cx="64" cy="63" rx="25" ry="31" fill="${skin}"/><ellipse cx="40" cy="64" rx="4" ry="7" fill="${skin}"/><ellipse cx="88" cy="64" rx="4" ry="7" fill="${skin}"/>${bangs}<path d="M49 61h4M75 61h4" stroke="#28263a" stroke-width="3.5" stroke-linecap="round"/><path d="M58 76Q64 81 70 76" stroke="#a76459" stroke-width="2" fill="none" stroke-linecap="round"/>${specs}${headset}<rect x="92" y="91" width="25" height="19" rx="5" fill="#fff" opacity=".95"/><path d="M99 100l-3 3 3 3M109 100l3 3-3 3" fill="none" stroke="${accent}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
  return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 };
-const osAvatarMarkup=(initials)=>{const a=osAvatar();return a?`<img src="${a}" alt="Мой аватар" class="os-avatar-img">`:initials};
+const osAvatarMarkup=(initials,id=S.uid)=>{const a=osAvatarForUser(id);return a?`<img src="${osAttr(a)}" alt="Аватар сотрудника" class="os-avatar-img" loading="lazy">`:osAttr(initials)};
 const osTelegramClean=value=>String(value||'').trim().replace(/^@/,'');
 const osTelegramValid=value=>!value||/^[A-Za-z0-9_]{5,32}$/.test(osTelegramClean(value));
 const osTelegramHref=value=>{const n=osTelegramClean(value);return /^[A-Za-z0-9_]{5,32}$/.test(n)?'https://t.me/'+n:''};
@@ -219,7 +254,7 @@ function vStaff(){
    </div>
   </section>`;
  })():'';
- return`${teamSummary}${muteManagement()}<div class="card"><h2>Сотрудники и отделы</h2><table><tr><th>ФИО</th><th>Отдел</th>${rk()>1?'<th>Email</th><th>Телефон</th>':''}<th>Роль</th><th>Telegram</th><th></th></tr>${DB.users.map(u=>`<tr><td>${u.name}</td><td>${rk()>1?`<div class="os-dept-editor"><input id="dept_${u.id}" type="text" maxlength="100" value="${String(u.dep||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" aria-label="Отдел: ${String(u.name||'Сотрудник').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" /><button class="btn sec" data-a="savedept" data-i="${u.id}" type="button">Сохранить</button></div>`:u.dep}</td>${rk()>1?`<td>${u.email||'—'}</td><td>${u.phone||'—'}</td>`:''}<td>${rk()>1?`<select id="rl_${u.id}" ${u.id==S.uid||u.role=='it'?'disabled title="Роль защищена"':''}>${Object.keys(RN).map(k=>`<option value="${k}" ${k==u.role?'selected':''}>${RN[k]}</option>`).join('')}</select>`:RN[u.role]}</td><td>${osTelegramHref(u.tg)?`<a class="os-telegram-link" href="${osTelegramHref(u.tg)}" target="_blank" rel="noopener noreferrer">@${osTelegramClean(u.tg)}</a>`:'<span class="mu">Не указан</span>'}</td><td>${rk()>1&&u.id!=S.uid&&u.role!='it'?`<button class="btn red" data-a="deluser" data-i="${u.id}">Удалить</button>`:''}</td></tr>`).join('')}</table></div>${rk()>1?`<div class="card"><h2>Регистрация нового пользователя (только ИТ-специалист)</h2><div class="ctrl"><label>ФИО<input id="un"></label><label>Отдел<input id="ud"></label><label>Email<input id="ue" class="em" autocomplete="off" placeholder="name@mail.ru"><small class="eh">Убедитесь в правильности ввода почты</small></label><label>Телефон<input id="up" class="ph" placeholder="+7 747 584 12 30"></label><label>Пароль<input id="upw" placeholder="не менее 6 символов"></label><label>Роль<select id="ur"><option value="user">Сотрудник</option><option value="admin">Администрация</option><option value="it">ИТ-специалист</option></select></label><button class="btn" data-a="adduser">Создать аккаунт</button></div></div>`:'<div class="card mu">🔒 Регистрация новых пользователей доступна только ИТ-специалисту.</div>'}<div class="card"><h2>Матрица прав доступа (RBAC)</h2><table><tr><th>Функция</th><th>Сотрудник</th><th>Администрация</th><th>ИТ</th></tr>${[['Карта, поиск, бронирование, изменение и отмена своих броней, QR',1,1,1],['Просмотр всех броней, отмена чужих броней, блокировка мест',0,1,1],['Аналитика загрузки, добавление сотрудников',0,1,1],['Назначение ролей, удаление пользователей',0,0,1],['Настройка правил, журнал аудита, состояние системы, сброс данных',0,0,1]].map(r=>`<tr><td>${r[0]}</td>${r.slice(1).map(v=>`<td>${v?'✅':'—'}</td>`).join('')}</tr>`).join('')}</table></div>`}
+ return`${teamSummary}${muteManagement()}<div class="card"><h2>Сотрудники и отделы</h2><table><tr><th>ФИО</th><th>Отдел</th>${rk()>1?'<th>Email</th><th>Телефон</th>':''}<th>Роль</th><th>Telegram</th><th></th></tr>${DB.users.map(u=>`<tr><td><span class="os-staff-person"><span class="os-staff-picture">${osAvatarMarkup(u.name.split(' ').map(x=>x[0]).slice(0,2).join(''),u.id)}</span><span>${osAttr(u.name)}</span></span></td><td>${rk()>1?`<div class="os-dept-editor"><input id="dept_${u.id}" type="text" maxlength="100" value="${String(u.dep||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" aria-label="Отдел: ${String(u.name||'Сотрудник').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" /><button class="btn sec" data-a="savedept" data-i="${u.id}" type="button">Сохранить</button></div>`:u.dep}</td>${rk()>1?`<td>${u.email||'—'}</td><td>${u.phone||'—'}</td>`:''}<td>${rk()>1?`<select id="rl_${u.id}" ${u.id==S.uid||u.role=='it'?'disabled title="Роль защищена"':''}>${Object.keys(RN).map(k=>`<option value="${k}" ${k==u.role?'selected':''}>${RN[k]}</option>`).join('')}</select>`:RN[u.role]}</td><td>${osTelegramHref(u.tg)?`<a class="os-telegram-link" href="${osTelegramHref(u.tg)}" target="_blank" rel="noopener noreferrer">@${osTelegramClean(u.tg)}</a>`:'<span class="mu">Не указан</span>'}</td><td>${rk()>1&&u.id!=S.uid&&u.role!='it'?`<button class="btn red" data-a="deluser" data-i="${u.id}">Удалить</button>`:''}</td></tr>`).join('')}</table></div>${rk()>1?`<div class="card"><h2>Регистрация нового пользователя (только ИТ-специалист)</h2><div class="ctrl"><label>ФИО<input id="un"></label><label>Отдел<input id="ud"></label><label>Email<input id="ue" class="em" autocomplete="off" placeholder="name@mail.ru"><small class="eh">Убедитесь в правильности ввода почты</small></label><label>Телефон<input id="up" class="ph" placeholder="+7 747 584 12 30"></label><label>Пароль<input id="upw" placeholder="не менее 6 символов"></label><label>Роль<select id="ur"><option value="user">Сотрудник</option><option value="admin">Администрация</option><option value="it">ИТ-специалист</option></select></label><button class="btn" data-a="adduser">Создать аккаунт</button></div></div>`:'<div class="card mu">🔒 Регистрация новых пользователей доступна только ИТ-специалисту.</div>'}<div class="card"><h2>Матрица прав доступа (RBAC)</h2><table><tr><th>Функция</th><th>Сотрудник</th><th>Администрация</th><th>ИТ</th></tr>${[['Карта, поиск, бронирование, изменение и отмена своих броней, QR',1,1,1],['Просмотр всех броней, отмена чужих броней, блокировка мест',0,1,1],['Аналитика загрузки, добавление сотрудников',0,1,1],['Назначение ролей, удаление пользователей',0,0,1],['Настройка правил, журнал аудита, состояние системы, сброс данных',0,0,1]].map(r=>`<tr><td>${r[0]}</td>${r.slice(1).map(v=>`<td>${v?'✅':'—'}</td>`).join('')}</tr>`).join('')}</table></div>`}
 function modal(){const m=S.m;if(!m)return'';
  if(m.t==='logout')return`<div class="mo os-logout-overlay" role="presentation"><div class="md os-logout-dialog" role="dialog" aria-modal="true" aria-labelledby="os-logout-title" aria-describedby="os-logout-desc"><span class="os-logout-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M12 3h6a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-6"/></svg></span><span class="os-logout-kicker">ЗАВЕРШЕНИЕ СЕАНСА</span><h2 id="os-logout-title">Уже уходите?</h2><p id="os-logout-desc">Вы действительно хотите выйти из OfficeSpace?</p><div class="os-logout-actions"><button type="button" class="os-logout-stay" data-a="close">Нет, остаться</button><button type="button" class="os-logout-leave" data-a="logout-confirm" aria-label="Удерживайте 1,8 секунды, чтобы выйти"><span class="os-logout-progress" aria-hidden="true"></span><span class="os-logout-leave-label">Да, хочу выйти</span></button></div></div></div>`;
 
@@ -280,15 +315,15 @@ function vAcc(){
  <div class="card os-account-card os-account-profile">
   <div class="os-account-title"><span class="os-account-icon" aria-hidden="true">01</span><div><h2>Профиль</h2><p>Личные данные и фотография сотрудника</p></div></div>
   <div class="os-account-avatar os-avatar-settings">
-   <div class="os-avatar-info"><h3>Мой аватар</h3><p class="mu">Выберите портрет из IT-коллекции или загрузите своё фото. Аватар хранится только в этом браузере.</p></div>
-   <div class="os-avatar-options">${osDevAvatarThemes.map((x,i)=>`<button type="button" class="os-avatar-option ${osAvatar()===osDevAvatarSvg(i)?'is-selected':''}" data-a="avatarpick" data-i="${i}" aria-label="Выбрать IT-аватар ${i+1}" title="IT-аватар ${i+1}"><img src="${osDevAvatarSvg(i)}" alt="" loading="lazy"></button>`).join('')}</div>
+   <div class="os-avatar-info"><h3>Мой аватар</h3><p class="mu">Выберите портрет из IT-коллекции или загрузите своё фото. Аватар сохраняется в Supabase и виден коллегам на других устройствах.</p></div>
+   <div class="os-avatar-options">${osDevAvatarThemes.map((x,i)=>`<button type="button" class="os-avatar-option ${DB.users.find(x=>x.id===S.uid)?.avatarPreset===i?'is-selected':''}" data-a="avatarpick" data-i="${i}" aria-label="Выбрать IT-аватар ${i+1}" title="IT-аватар ${i+1}"><img src="${osDevAvatarSvg(i)}" alt="" loading="lazy"></button>`).join('')}</div>
    <div class="os-account-avatar-actions">
     <input type="file" id="osAvatarUpload" accept="image/png,image/jpeg,image/webp" hidden style="display:none!important" aria-label="Загрузить свою фотографию">
     <label class="os-photo-picker" for="osAvatarUpload" tabindex="0" role="button">
       <span class="os-photo-picker-icon" aria-hidden="true">↥</span>
       <span class="os-photo-picker-copy"><strong>Выбрать фотографию</strong><small>PNG, JPG или WebP · до 1 МБ</small></span>
     </label>
-    <span class="os-photo-upload-status" aria-live="polite">${/^data:image\/(?:png|jpeg|webp);base64,/.test(osAvatar())?'Фотография загружена':'Можно загрузить фото или выбрать аватар выше'}</span>
+    <span class="os-photo-upload-status" aria-live="polite">${DB.users.find(x=>x.id===S.uid)?.avatarPath?'Фотография хранится в Supabase':'Выберите аватар или загрузите фото'}</span>
     <button type="button" class="btn sec os-photo-remove" data-a="avatarclear">Убрать аватар</button>
   </div>
   </div>
@@ -330,7 +365,7 @@ function vMsg(){
  const myMute=(DB.mutes||[]).find(m=>m.user_id===me&&(!m.expires_at||new Date(m.expires_at)>new Date()));
  const blocked=x=>{const pref=(DB.privacy||[]).find(p=>p.user_id===x.id);return pref&&(pref.mode==='none'||pref.mode==='admins'&&rk()<1)};
  const all=[...I,...O].filter(m=>!osHiddenMessages().includes(String(m.id))).sort((a,b)=>b.at-a.at),selected=all.find(m=>m.id===S.mo)||null;
- const listItem=m=>{const incoming=m.to===me,person=uname(incoming?m.from:m.to),initials=person.split(' ').map(x=>x[0]).slice(0,2).join('');return `<button class="thread ${S.mo===m.id?'selected':''} ${incoming&&!m.r?'unread':''}" data-a="mopen" data-i="${m.id}"><span class="thread-avatar">${esc(initials)}</span><span class="thread-body"><span class="thread-line"><b>${esc(person)}</b><small>${new Date(m.at).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'})}</small></span><span class="thread-subject">${esc(m.subj||m.type)}</span><span class="thread-excerpt">${esc((m.text||'').slice(0,78))}</span></span></button>`};
+ const listItem=m=>{const incoming=m.to===me,person=uname(incoming?m.from:m.to),initials=person.split(' ').map(x=>x[0]).slice(0,2).join('');return `<button class="thread ${S.mo===m.id?'selected':''} ${incoming&&!m.r?'unread':''}" data-a="mopen" data-i="${m.id}"><span class="thread-avatar">${osAvatarMarkup(initials,incoming?m.from:m.to)}</span><span class="thread-body"><span class="thread-line"><b>${esc(person)}</b><small>${new Date(m.at).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'})}</small></span><span class="thread-subject">${esc(m.subj||m.type)}</span><span class="thread-excerpt">${esc((m.text||'').slice(0,78))}</span></span></button>`};
  const privacy=rk()>=1?`<div class="mess-settings"><h3>Приватность</h3><label>Кто может писать мне<select id="privacyMode"><option value="all" ${DB.myPrivacy==='all'?'selected':''}>Все сотрудники</option><option value="admins" ${DB.myPrivacy==='admins'?'selected':''}>Только администрация и ИТ</option><option value="none" ${DB.myPrivacy==='none'?'selected':''}>Никто</option></select></label><button class="btn sec" data-a="saveprivacy">Сохранить</button></div>`:'';
  return `<div class="os-msg-dnd-shell"><details class="os-msg-dnd"><summary><span>🌙 Режим «Не беспокоить»</span><span class="os-msg-dnd-state">${dndActive()?'Включён':'Выключен'} · Настроить</span></summary>${dndSettings()}</details></div><section class="messenger"><aside class="mess-list"><div class="mess-panel-title"><span>Диалоги</span><span class="mess-count">${all.length}</span></div><div class="mess-filter">Все сообщения <span>· ${I.filter(m=>!m.r).length} непрочитанных</span></div><div class="mess-threads">${all.map(listItem).join('')||'<div class="mess-empty">Сообщений пока нет</div>'}</div></aside><div class="mess-center"><div class="mess-panel-title">${selected?esc(uname(selected.to===me?selected.from:selected.to)):'Переписка'}<span class="mess-online">${selected&&osTelegramHref(DB.users.find(u=>u.id===(selected.to===me?selected.from:selected.to))?.tg)?`<a class="os-telegram-link" target="_blank" rel="noopener noreferrer" href="${osTelegramHref(DB.users.find(u=>u.id===(selected.to===me?selected.from:selected.to))?.tg)}">Написать в Telegram ↗</a>`:'● OfficeSpace'}</span></div>${selected?`<div class="mess-conversation"><div class="mess-date">${new Date(selected.at).toLocaleString('ru-RU')}</div><div class="mess-bubble ${selected.from===me?'outgoing':''}"><span class="mess-bubble-kind">${esc(selected.type||'Сообщение')}</span><h3>${esc(selected.subj)}</h3><p>${esc(selected.text)}</p></div></div><div class="mess-bottom">${selected.to===me&&!myMute?`<button class="btn" data-a="mreply" data-i="${selected.id}">↩ Ответить</button>`:''}<button class="btn sec" data-a="mhide" data-i="${selected.id}" title="Скрыть это сообщение только на данном устройстве">Удалить у себя</button><span>История сообщений синхронизируется через Supabase</span></div>`:'<div class="mess-placeholder"><span class="mess-placeholder-icon">✉</span><h2>Выберите сообщение</h2><p>Здесь появится переписка с сотрудниками</p></div>'}</div><aside class="mess-compose"><div class="mess-panel-title">Новое сообщение</div><div class="mess-compose-content">${myMute?`<p class="mu">🔕 Отправка сообщений ограничена${myMute.expires_at?' до '+new Date(myMute.expires_at).toLocaleString('ru-RU'):''}.</p>`:''}<div class="mess-fields"><label>Получатель<select id="mto" ${myMute?'disabled':''}><option value="">Выберите сотрудника</option>${peers.map(x=>`<option value="${esc(x.id)}" ${rp.to===x.id?'selected':''} ${blocked(x)?'disabled':''}>${esc(x.name)}${blocked(x)?' · входящие закрыты':''}</option>`).join('')}</select></label><label>Тема<input id="msj" maxlength="200" value="${esc(rp.subj||'')}" placeholder="Тема сообщения" ${myMute?'disabled':''}></label><label>Сообщение<textarea id="mtx" rows="7" maxlength="10000" placeholder="Напишите сообщение..." ${myMute?'disabled':''}></textarea></label><button class="btn" data-a="msend" ${myMute?'disabled':''}>Отправить сообщение ↗</button></div>${privacy}</div></aside></section>`;
 }
@@ -379,7 +414,7 @@ async function cloudReadAllBookings(){
 }
 async function cloudFetch(){
  const [pr,wr,br,mr,sr,privacyResult,mutesResult,dndResult]=await Promise.all([
-  (async()=>{const q=await sb.from('profiles').select('id,full_name,department,phone,role,email,telegram_username').order('full_name');if(q.error?.code==='42703'||/telegram_username/.test(q.error?.message||'')){return sb.from('profiles').select('id,full_name,department,phone,role,email').order('full_name')}return q})(),
+  (async()=>{const q=await sb.from('profiles').select('id,full_name,department,phone,role,email,telegram_username,avatar_path,avatar_preset').order('full_name');if(q.error?.code==='42703'||/telegram_username/.test(q.error?.message||'')){return sb.from('profiles').select('id,full_name,department,phone,role,email').order('full_name')}return q})(),
   sb.from('workplaces').select('*').eq('is_active',true).order('id'),
   cloudReadAllBookings(),
   sb.from('office_messages').select('*').order('created_at',{ascending:false}).limit(500),
@@ -390,11 +425,12 @@ async function cloudFetch(){
  ]);
  for(const x of [pr,wr,br,mr,sr,privacyResult,mutesResult,dndResult])if(x.error)throw x.error;
  osTelegramColumnAvailable=(pr.data||[]).some(x=>Object.prototype.hasOwnProperty.call(x,'telegram_username'));
- DB={users:(pr.data||[]).map(x=>({id:x.id,name:x.full_name||'Сотрудник',dep:x.department||'—',phone:x.phone||'',email:x.email||(x.id===cloudUser.id?(cloudUser.email||''):''),tg:x.telegram_username||'',role:x.role})),
+ DB={users:(pr.data||[]).map(x=>({id:x.id,name:x.full_name||'Сотрудник',dep:x.department||'—',phone:x.phone||'',email:x.email||(x.id===cloudUser.id?(cloudUser.email||''):''),tg:x.telegram_username||'',avatarPath:x.avatar_path||null,avatarPreset:Number.isInteger(x.avatar_preset)?x.avatar_preset:null,role:x.role})),
   blocked:(wr.data||[]).filter(x=>x.is_blocked).map(x=>x.id),
   bk:(br.data||[]).map(x=>({id:x.id,uid:x.user_id,pid:x.workplace_id,d:x.booking_date,s:x.start_minute,e:x.end_minute,st:x.status})),
   dndUntil:dndResult.data?.until_at||null,privacy:privacyResult.data||[],myPrivacy:(privacyResult.data||[]).find(x=>x.user_id===cloudUser.id)?.mode||'all',mutes:mutesResult.data||[],nt:[],log:[],msgs:(mr.data||[]).map(x=>({id:x.id,from:x.sender_id,to:x.recipient_id,type:x.message_type,subj:x.subject,text:x.body,at:new Date(x.created_at).getTime(),r:x.is_read})),mid:0,cfg:{min:sr.data?.min_duration_minutes||30,hor:sr.data?.booking_horizon_days||14,ns:sr.data?.no_show_grace_minutes||30},id:1,pe:{},pn:[],pid:200};
  (wr.data||[]).forEach(x=>{DB.pe[x.id]={f:x.floor,r:x.row_no,c:x.col_no,zone:x.zone,t:x.title,eq:x.equipment||[],room:x.is_room?1:0,name:x.is_room?`Переговорная №${x.id-150}`:undefined,cap:x.capacity||undefined,del:!x.is_active}});
+ await osRefreshAvatarLinks(DB.users);
  const me=DB.users.find(x=>x.id===cloudUser.id);if(!me)throw new Error('Профиль пользователя не найден. Проверьте trigger handle_new_user и таблицу profiles.');
  S.uid=cloudUser.id;
  // Never replay old messages as new notifications on first load.
@@ -577,6 +613,7 @@ async function cloudLogin(){
  finally{if(button?.isConnected)button.disabled=false}
 }
 async function cloudLogout(){
+ osAvatarLinks.clear();
  // Явный выход завершает навигационную сессию пользователя.
  // При F5 без выхода сохранённая вкладка по-прежнему восстанавливается.
  try{if(S.uid)sessionStorage.removeItem(osViewKey(S.uid))}catch(e){}
@@ -600,6 +637,39 @@ async function cloudSaveDepartment(id,button){
   if(error)throw error;
   await cloudFetch();render();toast('Отдел сотрудника обновлён');
  }catch(e){toast('Не удалось изменить отдел: '+cloudError(e),1);if(button?.isConnected){button.disabled=false;button.textContent='Сохранить'}}
+}
+async function osCleanupOldAvatar(path){
+ if(!path||!cloudUser||!path.startsWith(cloudUser.id+'/'))return;
+ const {error}=await sb.storage.from(osAvatarBucket).remove([path]);
+ if(error)console.warn('[OfficeSpace] Old avatar cleanup:',error.message);
+ osAvatarLinks.delete(path);
+}
+async function osSaveAvatarPreset(index){
+ const old=DB.users.find(u=>u.id===S.uid)?.avatarPath;
+ if(await osSaveAvatarProfile({avatar_preset:index,avatar_path:null,updated_at:new Date().toISOString()},'Аватар сохранён в облаке'))await osCleanupOldAvatar(old);
+}
+async function osClearAvatar(){
+ const old=DB.users.find(u=>u.id===S.uid)?.avatarPath;
+ if(await osSaveAvatarProfile({avatar_preset:null,avatar_path:null,updated_at:new Date().toISOString()},'Аватар удалён'))await osCleanupOldAvatar(old);
+}
+async function osUploadAvatar(file){
+ if(!cloudUser)return toast('Войдите в аккаунт',1);
+ if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>1024*1024||file.size===0)return toast('Выберите JPG, PNG или WebP до 1 МБ',1);
+ const magic={ 'image/jpeg':'jpg','image/png':'png','image/webp':'webp' };
+ const ext=magic[file.type];
+ // Only the user's own directory is writable by storage RLS.
+ const path=cloudUser.id+'/'+crypto.randomUUID()+'.'+ext;
+ const el=document.querySelector('.os-photo-upload-status');if(el)el.textContent='Загружаем фотографию…';
+ try{
+  const old=DB.users.find(u=>u.id===S.uid)?.avatarPath;
+  const {error:uploadError}=await sb.storage.from(osAvatarBucket).upload(path,file,{cacheControl:'3600',upsert:false,contentType:file.type});
+  if(uploadError)throw uploadError;
+  const {error:profileError}=await sb.from('profiles').update({avatar_path:path,avatar_preset:null,updated_at:new Date().toISOString()}).eq('id',cloudUser.id);
+  if(profileError){await sb.storage.from(osAvatarBucket).remove([path]);throw profileError}
+  try{localStorage.removeItem(osLocalKey('avatar'))}catch(e){}
+  await cloudFetch();render();toast('Фото сохранено в Supabase');
+  await osCleanupOldAvatar(old);
+ }catch(e){toast('Ошибка загрузки аватара: '+cloudError(e),1);if(el?.isConnected)el.textContent='Не удалось загрузить фотографию'}
 }
 async function cloudSaveProfile(){
  const n=$('#an')?.value.trim(),ph=$('#ap')?.value.trim(),tg=osTelegramClean($('#at')?.value);
@@ -672,8 +742,8 @@ document.addEventListener('click',e=>{const a=e.target.closest('[data-a]'),g=e.t
  if(A==='all-next'){S.allPage=(S.allPage||0)+1;render();return}
  if(A==='zone'){S.zone=i;S.sel=null;render();return}
  if(A==='mhide'){if(!confirm('Скрыть сообщение в этом браузере? На других устройствах оно останется.'))return;const hidden=osHiddenMessages();hidden.push(String(i));localStorage.setItem(osLocalKey('hidden'),JSON.stringify(hidden));S.mo=null;render();toast('Сообщение скрыто на этом устройстве');return}
- if(A==='avatarpick'){const index=Number(i);if(!Number.isInteger(index)||index<0||index>=osDevAvatarThemes.length)return;try{localStorage.setItem(osLocalKey('avatar'),osDevAvatarSvg(index));render();toast('Аватар выбран')}catch(e){toast('Не удалось сохранить аватар',1)}return}
- if(A==='avatarclear'){localStorage.removeItem(osLocalKey('avatar'));render();return}
+ if(A==='avatarpick'){const index=Number(i);if(!Number.isInteger(index)||index<0||index>=osDevAvatarThemes.length)return;osSaveAvatarPreset(index);return}
+ if(A==='avatarclear'){osClearAvatar();return}
  if(A==='auth-visibility'){const pw=$('#pw');if(pw){pw.type=pw.type==='password'?'text':'password';a.setAttribute('aria-pressed',String(pw.type==='text'));a.setAttribute('aria-label',pw.type==='text'?'Скрыть пароль':'Показать пароль')}return}
  if(A=='login'){cloudLogin();return} if(A=='logout'){S.m={t:'logout'};render();return} if(A==='logout-confirm'){return} if(A=='blk'){cloudToggleBlock(+i);return} if(A=='saveprof'){cloudSaveProfile();return} if(A=='savepw'){cloudSavePassword();return} if(A==='msend'){cloudSendMessage();return} if(A==='dndon'){cloudSetDnd(false);return} if(A==='dndoff'){cloudSetDnd(true);return} if(A==='saveprivacy'){cloudSavePrivacy();return} if(A==='muteuser'){cloudSetMute();return} if(A==='unmuteuser'){cloudSetMute(true,i);return} if(A==='mopen'){cloudOpenMessage(i);return} if(A==='mreply'){const m=DB.msgs.find(x=>x.id===i);if(m){S.rp={to:m.from,subj:(m.subj.startsWith('Re: ')?'':'Re: ')+m.subj};S.mo=i;render()}return} if(['deluser','cfg','saveedit','scan','pesave','pedel','reset'].includes(A))return toast('Эта административная функция пока не подключена к облаку и отключена, чтобы не создавать локальные изменения.',1); if(A=='adduser'){cloudCreateUser();return;}
  if(A=='tab'){osDidNavigate=S.v!==i;S.v=i;S.nt=0}else if(A=='fl')S.f=+i;else if(A=='book')return book(+i);else if(A=='cancel')return cancel(i);
@@ -758,8 +828,8 @@ document.addEventListener('focusout',e=>{const t=e.target;if(t.tagName=='INPUT'&
 document.addEventListener('focusout',e=>{if(e.target.id==='lg')osAuthEmailHint(true)},true);
 new MutationObserver(()=>{const e=document.querySelector('.dc.on');if(e){const p=e.parentElement;p.scrollLeft=e.offsetLeft-p.clientWidth/2+e.offsetWidth/2}}).observe($('#app'),{childList:true});
 cloudBoot();setInterval(()=>{if(sb&&cloudUser&&!S.m)cloudRefresh()},15000);
-// Avatar upload is client-side only until an authorized Supabase Storage bucket is configured.
-document.addEventListener('change',async(e)=>{if(e.target.id!=='osAvatarUpload')return;const f=e.target.files?.[0];if(!f)return;if(!['image/png','image/jpeg','image/webp'].includes(f.type)||f.size>1024*1024)return toast('Выберите PNG, JPG или WebP до 1 МБ',1);const r=new FileReader();r.onload=()=>{try{localStorage.setItem(osLocalKey('avatar'),r.result);render();toast('Аватар сохранён в этом браузере')}catch(x){toast('Не удалось сохранить: изображение слишком большое',1)}};r.readAsDataURL(f)});
+// Cloud avatars: validated file is uploaded to the user's private Storage folder.
+document.addEventListener('change',async(e)=>{if(e.target.id!=='osAvatarUpload')return;const f=e.target.files?.[0];if(f)await osUploadAvatar(f)});
 
 
 // OfficeSpace: accessible centered calendar with manual date entry.

@@ -1212,3 +1212,10 @@ input[type="date"]{min-width:235px!important;min-height:55px!important;font-size
 .os-dept-editor input{flex:1;min-width:120px;max-width:240px;border-radius:9px;padding:10px 11px;font-size:13px}
 .os-dept-editor .btn{white-space:nowrap;border-radius:9px;min-height:40px;padding:9px 13px}
 @media(max-width:780px){.os-dept-editor{min-width:190px;flex-wrap:wrap}.os-dept-editor input{max-width:none;width:100%}.os-dept-editor .btn{width:100%}}
+
+/* OfficeSpace 5.8 — облачные аватары сотрудников */
+.os-staff-person{display:inline-flex;align-items:center;gap:12px;min-width:160px;font-weight:650}
+.os-staff-picture{display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;border-radius:12px;overflow:hidden;background:color-mix(in srgb,var(--ac) 20%,var(--card));font-size:12px;font-weight:800;color:var(--tx)}
+.os-staff-picture img,.thread-avatar img,.os-profile-avatar img,.os-top-avatar img{width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit}
+.thread-avatar{overflow:hidden}
+.os-photo-upload-status{line-height:1.4}
