@@ -1248,3 +1248,19 @@ body.os-delete-dialog-open{overflow:hidden}
 /* 6.1.1: guaranteed visible, dismissible block dialog */
 body>.mo.os-global-dialog{position:fixed!important;inset:0!important;display:flex!important;align-items:center!important;justify-content:center!important;z-index:1000000!important;padding:18px!important;background:rgba(5,9,27,.72)!important;backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
 body>.mo.os-global-dialog>.os-block-dialog{display:block!important;position:relative!important;z-index:1!important;visibility:visible!important;opacity:1!important;transform:none!important;width:min(470px,100%)!important;max-height:calc(100dvh - 36px);overflow:auto;background:var(--card)!important;color:var(--tx)!important;box-shadow:0 25px 80px rgba(0,0,0,.4)}
+
+/* OfficeSpace 6.1.2: reliable native block/unblock dialog */
+dialog.os-block-native{box-sizing:border-box;border:1px solid var(--bd);border-radius:22px;padding:0;width:min(490px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);overflow:auto;background:var(--card);color:var(--tx);box-shadow:0 24px 95px #0009;position:fixed;inset:0;margin:auto;z-index:2147483647}
+dialog.os-block-native::backdrop{background:rgba(4,8,26,.78);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+.os-native-content{padding:29px;text-align:left}
+.os-native-symbol{display:grid;place-items:center;width:56px;height:56px;border-radius:17px;background:color-mix(in srgb,var(--no) 14%,var(--card));font-size:25px;margin-bottom:16px}
+.os-block-native h2{font-size:21px;letter-spacing:-.4px;margin:0 0 10px;color:var(--tx)}
+.os-native-place{font-size:14px;margin:0 0 15px;color:var(--mu)}
+.os-native-label{display:block;margin-top:20px;color:var(--tx);font-weight:700;font-size:13px}
+.os-native-label textarea{display:block;width:100%;box-sizing:border-box;min-height:108px;margin-top:9px;resize:vertical;color:var(--tx);background:var(--input);border:1px solid var(--bd);border-radius:12px;padding:12px}
+.os-native-help{font-size:12px;color:var(--mu);line-height:1.6;margin:14px 0}
+.os-native-error{padding:10px 13px;border-radius:10px;background:color-mix(in srgb,var(--no) 12%,var(--card));color:var(--no);margin:12px 0}
+.os-native-error[hidden]{display:none}
+.os-native-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}
+.os-native-actions .btn{min-height:46px;border-radius:11px}
+@media(max-width:480px){.os-native-content{padding:20px}.os-native-actions{grid-template-columns:1fr}}

@@ -265,10 +265,6 @@ function vStaff(){
 function modal(){const m=S.m;if(!m)return'';
  if(m.t==='logout')return`<div class="mo os-logout-overlay" role="presentation"><div class="md os-logout-dialog" role="dialog" aria-modal="true" aria-labelledby="os-logout-title" aria-describedby="os-logout-desc"><span class="os-logout-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M12 3h6a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-6"/></svg></span><span class="os-logout-kicker">ЗАВЕРШЕНИЕ СЕАНСА</span><h2 id="os-logout-title">Уже уходите?</h2><p id="os-logout-desc">Вы действительно хотите выйти из OfficeSpace?</p><div class="os-logout-actions"><button type="button" class="os-logout-stay" data-a="close">Нет, остаться</button><button type="button" class="os-logout-leave" data-a="logout-confirm" aria-label="Удерживайте 1,8 секунды, чтобы выйти"><span class="os-logout-progress" aria-hidden="true"></span><span class="os-logout-leave-label">Да, хочу выйти</span></button></div></div></div>`;
 
- if(m.t==='block'){
-  const isBlocked=DB.blocked.includes(m.i),place=pl(m.i);
-  return `<div class="mo"><div class="md os-block-dialog" role="dialog" aria-modal="true" aria-labelledby="block-title"><div class="os-block-symbol">${isBlocked?'🔓':'🔒'}</div><h2 id="block-title">${isBlocked?'Разблокировать место?':'Заблокировать место?'}</h2><p>${esc(place?nm(place):'Рабочее место №'+m.i)}</p>${isBlocked?'<p class="mu">Новые бронирования снова станут доступны. Отменённые брони автоматически не восстановятся.</p>':`<label class="os-block-label">Причина блокировки<textarea id="blockReason" rows="3" maxlength="500" placeholder="Например: ремонт оборудования" required></textarea></label><p class="mu">Подтверждённые текущие и будущие брони отменятся. Сотрудники получат причину отмены в уведомлениях.</p>`}<div class="os-block-actions"><button class="btn sec" data-a="close">Назад</button><button class="btn ${isBlocked?'':'red'}" data-a="block-confirm" data-i="${m.i}">${isBlocked?'Разблокировать':'Заблокировать'}</button></div></div></div>`;
- }
  if(m.t==='lounge')return`<div class="mo os-lounge-backdrop" role="presentation"><div class="md os-lounge-dialog" role="dialog" aria-modal="true" aria-labelledby="os-lounge-title"><div class="os-lounge-dialog-icon" aria-hidden="true">☕</div><h2 id="os-lounge-title">Зона отдыха</h2><p class="os-lounge-lead">Пространство для перерывов на каждом этаже. <b>Бронирование не требуется.</b></p><div class="os-lounge-features"><div><span>☕</span><span>Кофе-автомат и чайная станция</span></div><div><span>🛋</span><span>Диваны и удобные кресла</span></div><div><span>🚰</span><span>Кулер с питьевой водой</span></div><div><span>🍽</span><span>Микроволновая печь и холодильник</span></div><div><span>📚</span><span>Книги и журналы</span></div></div><button class="btn os-lounge-close" data-a="close" type="button">Понятно, закрыть</button></div></div>`;
  if(m.t=='help')return`<div class="mo"><div class="md" style="max-width:540px;text-align:left"><h2>🕐 Зачем нужна «машина времени»?</h2><p>Это <b>демо-инструмент</b>. Часть функций зависит от времени, и без неё их пришлось бы ждать по-настоящему:</p><ul class="rl"><li><b>Автоосвобождение</b>: если через 30 минут после начала брони нет подтверждения, бронь становится «Не использовано», а место освобождается.</li><li><b>Напоминание</b> за 30 минут до начала.</li><li><b>QR-подтверждение</b>: доступно с −15 до +30 минут от начала брони.</li><li>Завершение броней и ночные брони.</li></ul><p><b>+1 ч / +1 д</b> сдвигают часы сайта вперёд. <b>Сброс</b> возвращает реальное время и откатывает данные к состоянию до симуляции: в демо-режиме изменения не сохраняются, а после перезагрузки страницы всё возвращается как было.</p><div style="text-align:right"><button class="btn" data-a="close">Понятно</button></div></div></div>`;const b=DB.bk.find(x=>x.id==m.i),p=pl(b.pid);
  if(m.t=='qr')return`<div class="mo"><div class="md"><h2>QR-код: ${nm(p)}</h2>${qr('OS-'+p.id+'-'+b.id)}<p class="mu">Демо-код. В системе у каждого места свой токен; подтверждение возможно за 15 мин до начала и до 30 мин после.</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn sec" data-a="tt" data-i="${b.id}">⏱ К началу брони</button><button class="btn" data-a="scan" data-i="${b.id}">Сканировать</button><button class="btn sec" data-a="close">Закрыть</button></div></div></div>`;
@@ -711,6 +707,58 @@ async function cloudLogout(){
 sweep=function(){return 0};
 book=async function(pid){const m=validate(pid,S.d,S.s,S.e,S.uid);if(m)return toast(m,1);const {error}=await sb.rpc('create_booking',{p_workplace_id:pid,p_booking_date:S.d,p_start_minute:S.s,p_end_minute:S.e});if(error)return toast(cloudError(error),1);await cloudRefresh();toast('Бронь сохранена в облаке: '+nm(pl(pid)));S.sel=null;render()};
 cancel=async function(id){const b=DB.bk.find(x=>x.id==id);if(!b)return toast('Бронь не найдена',1);if(b.uid!==S.uid&&rk()<1)return toast('Недостаточно прав',1);const {error}=await sb.from('bookings').update({status:'cancelled'}).eq('id',id);if(error)return toast(cloudError(error),1);await cloudRefresh();toast('Бронь отменена')};
+// OfficeSpace 6.1.2 — native modal in the browser top layer.
+// Independent of render() to prevent invisible overlays and lost input.
+function osCloseBlockDialog(){
+ const d=document.getElementById('osBlockDialog');
+ if(!d)return;
+ if(d.open)d.close();
+ d.remove();
+}
+function osOpenBlockDialog(id){
+ if(!cloudUser||rk()<1)return toast('Недостаточно прав для блокировки',1);
+ const p=pl(id);
+ if(!p)return toast('Рабочее место не найдено',1);
+ osCloseBlockDialog();
+ const blocked=DB.blocked.includes(id);
+ const d=document.createElement('dialog');
+ d.id='osBlockDialog';
+ d.className='os-block-native';
+ d.setAttribute('aria-labelledby','osBlockTitle');
+ d.innerHTML=`<div class="os-native-content">
+  <div class="os-native-symbol" aria-hidden="true">${blocked?'🔓':'🔒'}</div>
+  <h2 id="osBlockTitle">${blocked?'Разблокировать место?':'Заблокировать место?'}</h2>
+  <p class="os-native-place">${osAttr(nm(p))}</p>
+  ${blocked?'<p class="os-native-help">Место снова станет доступным. Отменённые брони не восстановятся автоматически.</p>':`<label class="os-native-label" for="osBlockReason">Причина блокировки<textarea id="osBlockReason" rows="3" maxlength="500" placeholder="Например, ремонт оборудования"></textarea></label><p class="os-native-help">Действующие и будущие бронирования будут отменены. Владельцы получат уведомления с причиной.</p>`}
+  <p id="osBlockError" class="os-native-error" role="alert" hidden></p>
+  <div class="os-native-actions"><button class="btn sec" type="button" id="osBlockCancel">Назад</button><button class="btn ${blocked?'':'red'}" type="button" id="osBlockConfirm">${blocked?'Разблокировать':'Заблокировать'}</button></div>
+ </div>`;
+ document.body.appendChild(d);
+ d.addEventListener('close',()=>d.remove(),{once:true});
+ d.addEventListener('click',e=>{if(e.target===d)osCloseBlockDialog()});
+ d.querySelector('#osBlockCancel').addEventListener('click',osCloseBlockDialog);
+ const confirm=d.querySelector('#osBlockConfirm');
+ confirm.addEventListener('click',async()=>{
+  const reason=d.querySelector('#osBlockReason')?.value.trim()||'';
+  const errorEl=d.querySelector('#osBlockError');
+  if(!blocked&&reason.length<5){errorEl.textContent='Укажите причину блокировки — минимум 5 символов.';errorEl.hidden=false;d.querySelector('#osBlockReason')?.focus();return}
+  confirm.disabled=true;confirm.textContent='Сохранение…';errorEl.hidden=true;
+  try{
+   const {error}=await sb.rpc('office_set_workplace_block',{p_workplace_id:id,p_block:!blocked,p_reason:blocked?null:reason});
+   if(error)throw error;
+   osCloseBlockDialog();
+   await cloudRefresh();
+   toast(blocked?'Место разблокировано':'Место заблокировано. Затронутые брони отменены.');
+  }catch(err){
+   if(!d.isConnected){toast('Ошибка блокировки: '+cloudError(err),1);return}
+   errorEl.textContent='Ошибка Supabase: '+cloudError(err);errorEl.hidden=false;
+   console.error('[OfficeSpace] block RPC',err);
+  }finally{if(d.isConnected){confirm.disabled=false;confirm.textContent=blocked?'Разблокировать':'Заблокировать'}}
+ });
+ try{d.showModal()}catch(err){d.remove();toast('Не удалось открыть окно: '+err.message,1)}
+ if(!blocked)d.querySelector('#osBlockReason')?.focus();
+ else d.querySelector('#osBlockCancel')?.focus();
+}
 async function cloudToggleBlock(id,reason=''){
  if(rk()<1)return toast('Недостаточно прав',1);
  const blocked=DB.blocked.includes(id);
@@ -904,9 +952,6 @@ document.addEventListener('click',e=>{const a=e.target.closest('[data-a]'),g=e.t
  if(g&&!a){S.sel=+g.dataset.id;S.ec=null;S.dc=0;S.nt=0;return render()}
  if(!a){if(S.nt&&!e.target.closest('.nt')){S.nt=0;render()}return}
  const A=a.dataset.a,i=a.dataset.i;e.preventDefault();
- if(S.m?.t==='block' && !e.target.closest('.os-block-dialog') && e.target.closest('.os-global-dialog')){
-   S.m=null;render();return;
- }
  if(A==='savedept'){cloudSaveDepartment(i,a);return}
  if(A==='lounge'){S.m={t:'lounge'};render();return}
  if(A==='all-dates'){S.allDates=!S.allDates;S.allPage=0;render();return}
@@ -917,7 +962,7 @@ document.addEventListener('click',e=>{const a=e.target.closest('[data-a]'),g=e.t
  if(A==='avatarpick'){const index=Number(i);if(!Number.isInteger(index)||index<0||index>=osDevAvatarThemes.length)return;osSaveAvatarPreset(index);return}
  if(A==='avatarclear'){osClearAvatar();return}
  if(A==='auth-visibility'){const pw=$('#pw');if(pw){pw.type=pw.type==='password'?'text':'password';a.setAttribute('aria-pressed',String(pw.type==='text'));a.setAttribute('aria-label',pw.type==='text'?'Скрыть пароль':'Показать пароль')}return}
- if(A=='login'){cloudLogin();return} if(A=='logout'){S.m={t:'logout'};render();return} if(A==='logout-confirm'){return} if(A==='blk'){if(rk()<1)return toast('Недостаточно прав',1);S.m={t:'block',i:+i};render();return} if(A==='block-confirm'){const id=Number(i),reason=$('#blockReason')?.value||'';cloudToggleBlock(id,reason);return} if(A=='saveprof'){cloudSaveProfile();return} if(A=='savepw'){cloudSavePassword();return} if(A==='msend'){cloudSendMessage();return} if(A==='dndon'){cloudSetDnd(false);return} if(A==='dndoff'){cloudSetDnd(true);return} if(A==='saveprivacy'){cloudSavePrivacy();return} if(A==='muteuser'){cloudSetMute();return} if(A==='unmuteuser'){cloudSetMute(true,i);return} if(A==='mopen'){cloudOpenMessage(i);return} if(A==='mreply'){const m=DB.msgs.find(x=>x.id===i);if(m){S.rp={to:m.from,subj:(m.subj.startsWith('Re: ')?'':'Re: ')+m.subj};S.mo=i;render()}return} if(A==='cfg'){cloudSaveSettings(a);return} if(['deluser','saveedit','scan','pesave','pedel','reset'].includes(A))return toast('Эта административная функция пока не подключена к облаку и отключена, чтобы не создавать локальные изменения.',1); if(A=='adduser'){cloudCreateUser();return;}
+ if(A=='login'){cloudLogin();return} if(A=='logout'){S.m={t:'logout'};render();return} if(A==='logout-confirm'){return} if(A==='blk'){osOpenBlockDialog(Number(i));return} if(A=='saveprof'){cloudSaveProfile();return} if(A=='savepw'){cloudSavePassword();return} if(A==='msend'){cloudSendMessage();return} if(A==='dndon'){cloudSetDnd(false);return} if(A==='dndoff'){cloudSetDnd(true);return} if(A==='saveprivacy'){cloudSavePrivacy();return} if(A==='muteuser'){cloudSetMute();return} if(A==='unmuteuser'){cloudSetMute(true,i);return} if(A==='mopen'){cloudOpenMessage(i);return} if(A==='mreply'){const m=DB.msgs.find(x=>x.id===i);if(m){S.rp={to:m.from,subj:(m.subj.startsWith('Re: ')?'':'Re: ')+m.subj};S.mo=i;render()}return} if(A==='cfg'){cloudSaveSettings(a);return} if(['deluser','saveedit','scan','pesave','pedel','reset'].includes(A))return toast('Эта административная функция пока не подключена к облаку и отключена, чтобы не создавать локальные изменения.',1); if(A=='adduser'){cloudCreateUser();return;}
  if(A=='tab'){osDidNavigate=S.v!==i;S.v=i;S.nt=0}else if(A=='fl')S.f=+i;else if(A=='book')return book(+i);else if(A=='cancel')return cancel(i);
  else if(A=='goto'){S.sel=+i;S.f=pl(+i).f;S.v='map';osDidNavigate=true}
  else if(A=='blk'){if(rk()<1)return toast('Недостаточно прав',1);const id=+i,k=DB.blocked.indexOf(id);k<0?DB.blocked.push(id):DB.blocked.splice(k,1);audit((k<0?'Заблокировано ':'Разблокировано ')+nm(pl(id)));save()}
