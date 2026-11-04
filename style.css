@@ -1264,3 +1264,20 @@ dialog.os-block-native::backdrop{background:rgba(4,8,26,.78);backdrop-filter:blu
 .os-native-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}
 .os-native-actions .btn{min-height:46px;border-radius:11px}
 @media(max-width:480px){.os-native-content{padding:20px}.os-native-actions{grid-template-columns:1fr}}
+
+/* OfficeSpace 6.1.3 — native notification center */
+dialog.os-notifications-dialog{box-sizing:border-box;width:min(510px,calc(100vw - 24px));max-height:min(680px,calc(100dvh - 32px));margin:auto;border:1px solid var(--bd);border-radius:22px;padding:0;background:var(--card);color:var(--tx);box-shadow:0 28px 100px #03091999;overflow:hidden}
+dialog.os-notifications-dialog::backdrop{background:rgba(5,8,24,.7);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+.os-notifications-header{padding:22px 24px 17px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:12px}
+.os-notifications-header small{color:var(--ac);font-size:10px;letter-spacing:1.6px;font-weight:800}
+.os-notifications-header h2{font-size:21px;letter-spacing:-.5px;margin:5px 0 0;color:var(--tx)}
+.os-notifications-close{height:36px;width:36px;flex-shrink:0;border-radius:10px;border:1px solid var(--bd);color:var(--tx);background:var(--zn);font-size:17px}
+.os-notifications-close:hover{border-color:var(--ac);color:var(--ac)}
+.os-notifications-list{overflow:auto;max-height:min(570px,calc(100dvh - 140px));padding:10px}
+.os-notification-item{position:relative;display:flex;flex-direction:column;text-align:left;gap:9px;width:100%;padding:16px 42px 16px 16px;border:1px solid transparent;border-bottom-color:var(--bd);background:transparent;color:var(--tx);border-radius:11px;cursor:pointer}
+.os-notification-item:hover{background:var(--zn)}
+.os-notification-item.unread{background:color-mix(in srgb,var(--ac) 9%,var(--card));border-color:color-mix(in srgb,var(--ac) 20%,var(--bd))}
+.os-notification-body{font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.os-notification-date{font-size:11px;color:var(--mu)}
+.os-notification-dot{position:absolute;right:17px;top:23px;width:8px;height:8px;border-radius:50%;background:var(--ac)}
+.os-notifications-empty{padding:48px 20px;text-align:center;color:var(--mu)}

@@ -948,10 +948,58 @@ async function cloudOpenMessage(id){
  if(m.to===S.uid&&!m.r){m.r=true;const {error}=await sb.from('office_messages').update({is_read:true}).eq('id',id).eq('recipient_id',cloudUser.id);if(error)toast(cloudError(error),1)}
  render();
 }
+// OfficeSpace 6.1.3 — notifications in a native top-layer dialog.
+function osOpenNotifications(){
+ if(!cloudUser||!sb)return toast('Войдите в аккаунт',1);
+ const old=document.getElementById('osNotificationsDialog');
+ if(old){old.close();old.remove();return}
+ S.nt=0;
+ const dialog=document.createElement('dialog');
+ dialog.id='osNotificationsDialog';
+ dialog.className='os-notifications-dialog';
+ dialog.setAttribute('aria-labelledby','osNotificationsTitle');
+ const head=document.createElement('div');
+ head.className='os-notifications-header';
+ const label=document.createElement('div');
+ const eyebrow=document.createElement('small');eyebrow.textContent='OFFICESPACE';
+ const title=document.createElement('h2');title.id='osNotificationsTitle';title.textContent='Уведомления';
+ label.append(eyebrow,title);
+ const close=document.createElement('button');close.type='button';close.className='os-notifications-close';close.textContent='✕';close.setAttribute('aria-label','Закрыть уведомления');
+ head.append(label,close);
+ const body=document.createElement('div');body.className='os-notifications-list';
+ dialog.append(head,body);document.body.appendChild(dialog);
+ const dismiss=()=>{if(dialog.open)dialog.close();dialog.remove()};
+ close.addEventListener('click',dismiss);
+ dialog.addEventListener('close',()=>dialog.remove());
+ dialog.addEventListener('click',e=>{if(e.target===dialog)dismiss()});
+ const show=()=>{
+  body.replaceChildren();
+  const items=(DB?.nt||[]).filter(n=>String(n.u)===String(S.uid)).slice(0,100);
+  if(!items.length){const empty=document.createElement('div');empty.className='os-notifications-empty';empty.textContent='Пока уведомлений нет';body.appendChild(empty);return}
+  for(const n of items){
+   const item=document.createElement('button');item.type='button';item.className='os-notification-item'+(n.r?'':' unread');
+   const main=document.createElement('span');main.className='os-notification-body';main.textContent=n.t||'Уведомление';
+   const stamp=document.createElement('span');stamp.className='os-notification-date';stamp.textContent=new Date(n.at).toLocaleString('ru-RU');
+   item.append(main,stamp);
+   if(!n.r){const dot=document.createElement('span');dot.className='os-notification-dot';dot.setAttribute('aria-label','Не прочитано');item.appendChild(dot)}
+   item.addEventListener('click',async()=>{
+    if(n.r)return;
+    item.disabled=true;
+    const {data,error}=await sb.from('office_notifications').update({is_read:true}).eq('id',n.id).eq('user_id',cloudUser.id).select('id');
+    if(error||!data?.length){item.disabled=false;toast('Не удалось отметить прочитанным: '+cloudError(error),1);return}
+    n.r=true;show();render();
+   });
+   body.appendChild(item);
+  }
+ };
+ show();
+ try{dialog.showModal()}catch(error){dialog.remove();toast('Не удалось открыть уведомления: '+error.message,1)}
+}
 document.addEventListener('click',e=>{const a=e.target.closest('[data-a]'),g=e.target.closest('[data-id]');
  if(g&&!a){S.sel=+g.dataset.id;S.ec=null;S.dc=0;S.nt=0;return render()}
  if(!a){if(S.nt&&!e.target.closest('.nt')){S.nt=0;render()}return}
  const A=a.dataset.a,i=a.dataset.i;e.preventDefault();
+ if(A==='bell'){osOpenNotifications();return}
  if(A==='savedept'){cloudSaveDepartment(i,a);return}
  if(A==='lounge'){S.m={t:'lounge'};render();return}
  if(A==='all-dates'){S.allDates=!S.allDates;S.allPage=0;render();return}
