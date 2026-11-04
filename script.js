@@ -269,7 +269,7 @@ function modal(){const m=S.m;if(!m)return'';
  if(m.t=='help')return`<div class="mo"><div class="md" style="max-width:540px;text-align:left"><h2>🕐 Зачем нужна «машина времени»?</h2><p>Это <b>демо-инструмент</b>. Часть функций зависит от времени, и без неё их пришлось бы ждать по-настоящему:</p><ul class="rl"><li><b>Автоосвобождение</b>: если через 30 минут после начала брони нет подтверждения, бронь становится «Не использовано», а место освобождается.</li><li><b>Напоминание</b> за 30 минут до начала.</li><li><b>QR-подтверждение</b>: доступно с −15 до +30 минут от начала брони.</li><li>Завершение броней и ночные брони.</li></ul><p><b>+1 ч / +1 д</b> сдвигают часы сайта вперёд. <b>Сброс</b> возвращает реальное время и откатывает данные к состоянию до симуляции: в демо-режиме изменения не сохраняются, а после перезагрузки страницы всё возвращается как было.</p><div style="text-align:right"><button class="btn" data-a="close">Понятно</button></div></div></div>`;const b=DB.bk.find(x=>x.id==m.i),p=pl(b.pid);
  if(m.t=='qr')return`<div class="mo"><div class="md"><h2>QR-код: ${nm(p)}</h2>${qr('OS-'+p.id+'-'+b.id)}<p class="mu">Демо-код. В системе у каждого места свой токен; подтверждение возможно за 15 мин до начала и до 30 мин после.</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn sec" data-a="tt" data-i="${b.id}">⏱ К началу брони</button><button class="btn" data-a="scan" data-i="${b.id}">Сканировать</button><button class="btn sec" data-a="close">Закрыть</button></div></div></div>`;
  return`<div class="mo"><div class="md"><h2>Изменить бронь</h2><p>${nm(p)}, ${fmtD(b.d)}</p><div class="ctrl" style="justify-content:center"><label>Начало<input type="time" id="es" step="900" value="${tm(b.s)}"></label><label>Конец<input type="time" id="ee" step="900" value="${tm(b.e)}"></label></div><br><div style="display:flex;gap:8px;justify-content:center"><button class="btn" data-a="saveedit" data-i="${b.id}">Сохранить</button><button class="btn sec" data-a="close">Отмена</button></div></div></div>`}
-function vSys(){const c=DB.cfg,L=(DB.log||[]).slice(0,40);return`<div class="mw"><div class="card"><h2>⚙️ Параметры бизнес-правил</h2><div class="ctrl"><label>Мин. длительность, мин<input id="c1" type="number" min="15" step="15" value="${c.min}"></label><label>Горизонт, дней<input id="c2" type="number" min="1" max="90" value="${c.hor}"></label><label>Автоосвобождение, мин<input id="c3" type="number" min="5" max="120" value="${c.ns}"></label></div><br><button class="btn" data-a="cfg">Сохранить</button><h2 style="margin-top:20px">Состояние системы</h2><div class="row"><span>Пользователей</span><b>${DB.users.length}</b></div><div class="row"><span>Броней в базе</span><b>${DB.bk.length}</b></div><div class="row"><span>Заблокировано мест</span><b>${DB.blocked.length}</b></div><div class="row"><span>Ресурсов (места и переговорные)</span><b>${P.length}</b></div></div><div class="card"><h2>🧾 Журнал аудита</h2>${L.map(l=>`<p style="margin:0;padding:6px 0;border-bottom:1px dashed var(--bd);font-size:13px"><b>${uname(l.u)}</b>: ${l.t}<br><small class="mu">${new Date(l.at).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small></p>`).join('')||'<div class="hint">Журнал пуст. Совершите действие — оно появится здесь</div>'}</div></div>`}
+function vSys(){const c=DB.cfg,L=(DB.log||[]).slice(0,40);return`<div class="mw"><div class="card"><h2>⚙️ Параметры бизнес-правил</h2><div class="ctrl"><label>Мин. длительность, мин<input id="c1" type="number" min="15" step="15" value="${c.min}"></label><label>Горизонт, дней<input id="c2" type="number" min="1" max="90" value="${c.hor}"></label><label>Автоосвобождение, мин<input id="c3" type="number" min="5" max="120" value="${c.ns}"></label></div><br><button class="btn" data-a="cfg">Сохранить</button><p class="os-settings-note">Настройки сохраняются в Supabase. Изменять их может только ИТ-специалист.</p><h2 style="margin-top:20px">Состояние системы</h2><div class="row"><span>Пользователей</span><b>${DB.users.length}</b></div><div class="row"><span>Броней в базе</span><b>${DB.bk.length}</b></div><div class="row"><span>Заблокировано мест</span><b>${DB.blocked.length}</b></div><div class="row"><span>Ресурсов (места и переговорные)</span><b>${P.length}</b></div></div><div class="card"><h2>🧾 Журнал аудита</h2>${L.map(l=>`<p style="margin:0;padding:6px 0;border-bottom:1px dashed var(--bd);font-size:13px"><b>${uname(l.u)}</b>: ${l.t}<br><small class="mu">${new Date(l.at).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small></p>`).join('')||'<div class="hint">Журнал пуст. Совершите действие — оно появится здесь</div>'}</div></div>`}
 function loginView(){
  const isLight=document.documentElement.dataset.theme==='light';
  const themeIcon=isLight?'☾':'☀';
@@ -351,17 +351,19 @@ const ld=d=>{const s=new Set();DB.bk.forEach(b=>{if(b.d==d&&!(pl(b.pid)||{room:1
 function fixT(){if(!['map','search'].includes(S.v))return;const n=new Date(now()),td=ds(n);let nm=Math.ceil((n.getHours()*60+n.getMinutes())/15)*15;if(S.d<td)S.d=td;
  if(S.d==td&&nm>=1440){const x=new Date(n);x.setDate(x.getDate()+1);S.d=ds(x);nm=0}
  const mx=ds(new Date(now()+DB.cfg.hor*864e5));if(S.d>mx)S.d=mx;if(S.d==td&&S.s<nm)S.s=nm;
- if(S.e-S.s<DB.cfg.min)S.e=S.s+120;if(S.e-S.s>960)S.e=S.s+960}
+ if(S.e-S.s<DB.cfg.min)S.e=S.s+DB.cfg.min;if(S.e-S.s>960)S.e=S.s+960}
 function ctrl(dateOnly){if(dateOnly)return ctrlOld(1);const n=new Date(now()),td=ds(n),nm=Math.ceil((n.getHours()*60+n.getMinutes())/15)*15,cm=S.cm||'strip',isT=S.d==td,
  days=[...Array(DB.cfg.hor+1)].map((_,i)=>{const x=new Date(n);x.setDate(x.getDate()+i);return ds(x)}),dl=d=>new Date(d+'T00:00').getDay();
  const dsel=cm=='cal'?`<div class="os-date-value"><button type="button" class="os-calendar-opener" data-picker="open" aria-haspopup="dialog" aria-label="Выбрать дату, в том числе вручную"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4M17 3v4M3 10h18M8 14h2M14 14h2"/></svg><span>${S.d.slice(8)}.${S.d.slice(5,7)}.${S.d.slice(0,4)}</span><svg class="os-calendar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><p class="os-calendar-hint">Нажмите на поле, чтобы открыть календарь или ввести дату вручную</p></div>`:cm=='list'?`<div class="os-date-value"><select id="cd" aria-label="Выберите дату">${days.map(d=>`<option value="${d}" ${d==S.d?'selected':''}>${d.slice(8)}.${d.slice(5,7)} — ${WD[dl(d)]}${d==td?' (сегодня)':''}</option>`).join('')}</select></div>`:`<div class="strip">${days.map(d=>`<button class="dc ${d==S.d?'on':''}" data-a="day" data-i="${d}"><small>${WS[dl(d)]}</small><b>${+d.slice(8)}</b><i>${ld(d)}%</i></button>`).join('')}</div>`;
  const so=[],eo=[];for(let m=isT?nm:0;m<1440;m+=15)so.push(`<option value="${m}" ${m==S.s?'selected':''}>${tm(m)}</option>`);
  for(let m=S.s+DB.cfg.min;m<=S.s+960;m+=15){const du=m-S.s;eo.push(`<option value="${m}" ${m==S.e?'selected':''}>${tm(m)}${m>=1440?' (+1 день)':''} · ${du>=60?Math.floor(du/60)+' ч'+(du%60?' '+du%60+' мин':''):du+' мин'}</option>`)}
- const pre=[['Весь день',540,1080],['Утро',540,780],['После обеда',780,1080],['Вечер',1080,1320],['Ночь',1380,1620]],du=[[30,'30 мин'],[60,'1 ч'],[120,'2 ч'],[240,'4 ч'],[480,'8 ч']];
+ const pre=[['Весь день',540,1080],['Утро',540,780],['После обеда',780,1080],['Вечер',1080,1320],['Ночь',1380,1620]];
+ const durationLabel=m=>m>=60?(Math.floor(m/60)+' ч'+(m%60?' '+m%60+' мин':'')):m+' мин';
+ const du=[...new Set([DB.cfg.min,30,60,120,240,480].filter(m=>m>=DB.cfg.min&&m<=960))].sort((a,b)=>a-b).map(m=>[m,durationLabel(m)]);
  return`<div class="card os-date-controls"><div class="cr"><div class="cl">Дата</div><div class="seg os-date-modes"><button class="${cm==='strip'?'on':''}" data-a="cm" data-i="strip" aria-pressed="${cm==='strip'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 9h10M7 13h7M7 16h4"/></svg><span>Лента</span></button><button class="${cm==='cal'?'on':''}" data-a="cm" data-i="cal" aria-pressed="${cm==='cal'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4M17 3v4M3 10h18M8 14h2M14 14h2M8 18h2"/></svg><span>Календарь</span></button><button class="${cm==='list'?'on':''}" data-a="cm" data-i="list" aria-pressed="${cm==='list'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 9h10M8 13h10M8 17h7"/><path d="M6 9h.01M6 13h.01M6 17h.01"/></svg><span>Список</span></button></div></div><div class="cr os-date-selection">${dsel}</div>
  <div class="cr"><div class="cl">Время</div><div class="tt"><label>Начало<select id="cs">${so.join('')}</select></label><span>→</span><label>Конец<select id="ce">${eo.join('')}</select></label><div class="sum">🕒 ${tm(S.s)}–${tm(S.e)}${S.e>1440?' (до след. дня)':''}</div></div></div>
- <div class="cr"><div class="cl">Быстрый выбор</div><div class="chs">${pre.map(p=>`<button class="ch" data-a="pre" data-i="${p[1]}-${p[2]}" ${isT&&p[1]<nm?'disabled':''}>${p[0]} <small>${tm(p[1])}–${tm(p[2])}</small></button>`).join('')}${du.filter(x=>x[0]>=DB.cfg.min).map(x=>`<button class="ch" data-a="dur" data-i="${x[0]}">на ${x[1]}</button>`).join('')}</div></div>
- <div class="mu" style="font-size:12px">Прошедшее время не отображается. Правила: от ${DB.cfg.min} мин, до ${DB.cfg.hor} дн. вперёд, без пересечений. Ночную бронь выбирайте в «Конец» с пометкой (+1 день).</div></div>`}
+ <div class="cr"><div class="cl">Быстрый выбор</div><div class="chs">${pre.map(p=>`<button class="ch" data-a="pre" data-i="${p[1]}-${p[2]}" ${(isT&&p[1]<nm)||(p[2]-p[1]<DB.cfg.min)?'disabled':''}>${p[0]} <small>${tm(p[1])}–${tm(p[2])}</small></button>`).join('')}${du.filter(x=>x[0]>=DB.cfg.min).map(x=>`<button class="ch" data-a="dur" data-i="${x[0]}">на ${x[1]}</button>`).join('')}</div></div>
+ <div class="mu" style="font-size:12px"><strong>Правила бронирования:</strong> минимум ${DB.cfg.min} мин · доступно на ${DB.cfg.hor} дн. вперёд · пересечения запрещены. Прошедшее время недоступно. Для ночной брони выберите время окончания с пометкой (+1 день).</div></div>`}
 function guide(){
  return`<div class="card floor-rest-guide"><h2>☕ Зона отдыха</h2><p>На каждом этаже есть зона отдыха. <b>Её не нужно бронировать</b> — приходите в любое время.</p><ul class="rl"><li>☕ Кофе-автомат и чайная станция</li><li>🛋 Мягкие диваны и кресла</li><li>🚰 Кулер с питьевой водой</li><li>🍽 Микроволновая печь и холодильник</li><li>📚 Стеллаж с книгами и журналами</li></ul><p class="mu" style="font-size:12px">Зона отдыха отмечена на плане этажа пунктирной рамкой.</p></div>`;
 }
@@ -409,6 +411,38 @@ let sb=null, cloudUser=null, cloudChannel=null, cloudBusy=false, cloudPending=fa
 const CLOUD_URL=window.OFFICESPACE_SUPABASE_URL;
 const CLOUD_KEY=window.OFFICESPACE_SUPABASE_ANON_KEY;
 function cloudError(err){return (err&&err.message)||'Не удалось выполнить запрос к облачной базе'}
+// OfficeSpace 6.0 — cloud-backed IT booking settings.
+let osSettingsSaving=false;
+async function cloudSaveSettings(button){
+ if(osSettingsSaving)return;
+ if(!sb||!cloudUser||!DB)return toast('Войдите в аккаунт',1);
+ if(DB.users.find(u=>u.id===cloudUser.id)?.role!=='it')
+  return toast('Изменять настройки может только ИТ-специалист',1);
+ const raw=['c1','c2','c3'].map(id=>document.getElementById(id)?.value?.trim());
+ const nums=raw.map(Number);
+ if(raw.some(v=>v===undefined||v==='')||nums.some(n=>!Number.isSafeInteger(n)))
+  return toast('Введите целые числа во все три поля',1);
+ const [min,hor,ns]=nums;
+ if(min<15||min>1440||min%15!==0)return toast('Минимальная длительность: от 15 до 1440 минут, шаг 15',1);
+ if(hor<1||hor>90)return toast('Горизонт бронирования: от 1 до 90 дней',1);
+ if(ns<5||ns>120)return toast('Автоосвобождение: от 5 до 120 минут',1);
+ osSettingsSaving=true;
+ if(button){button.disabled=true;button.textContent='Сохранение…'}
+ try{
+  const payload={min_duration_minutes:min,booking_horizon_days:hor,no_show_grace_minutes:ns,updated_at:new Date().toISOString()};
+  const {data,error}=await sb.from('office_settings').update(payload).eq('id',1)
+   .select('min_duration_minutes,booking_horizon_days,no_show_grace_minutes').single();
+  if(error)throw error;
+  if(!data)throw new Error('Запись настроек не найдена');
+  DB.cfg={min:data.min_duration_minutes,hor:data.booking_horizon_days,ns:data.no_show_grace_minutes};
+  toast('Настройки сохранены в Supabase');
+  fixT();render();
+ }catch(err){
+  console.error('[OfficeSpace] settings save failed',err);
+  toast('Не удалось сохранить настройки: '+cloudError(err),1);
+  if(button){button.disabled=false;button.textContent='Сохранить'}
+ }finally{osSettingsSaving=false}
+}
 async function cloudReadAllBookings(){
  const rows=[];let offset=0;
  for(;;){
@@ -472,6 +506,7 @@ async function cloudSubscribe(){
   .on('postgres_changes',{event:'*',schema:'public',table:'bookings'},()=>cloudRefresh())
   .on('postgres_changes',{event:'*',schema:'public',table:'workplaces'},()=>cloudRefresh())
   .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},()=>cloudRefresh())
+  .on('postgres_changes',{event:'UPDATE',schema:'public',table:'office_settings'},()=>cloudRefresh())
   .on('postgres_changes',{event:'*',schema:'public',table:'office_messages'},()=>cloudRefresh())
   .on('postgres_changes',{event:'INSERT',schema:'public',table:'message_hidden',filter:'user_id=eq.'+cloudUser.id},()=>osSyncHiddenMessages())
   .on('postgres_changes',{event:'*',schema:'public',table:'message_mutes'},()=>cloudRefresh())
@@ -861,7 +896,7 @@ document.addEventListener('click',e=>{const a=e.target.closest('[data-a]'),g=e.t
  if(A==='avatarpick'){const index=Number(i);if(!Number.isInteger(index)||index<0||index>=osDevAvatarThemes.length)return;osSaveAvatarPreset(index);return}
  if(A==='avatarclear'){osClearAvatar();return}
  if(A==='auth-visibility'){const pw=$('#pw');if(pw){pw.type=pw.type==='password'?'text':'password';a.setAttribute('aria-pressed',String(pw.type==='text'));a.setAttribute('aria-label',pw.type==='text'?'Скрыть пароль':'Показать пароль')}return}
- if(A=='login'){cloudLogin();return} if(A=='logout'){S.m={t:'logout'};render();return} if(A==='logout-confirm'){return} if(A=='blk'){cloudToggleBlock(+i);return} if(A=='saveprof'){cloudSaveProfile();return} if(A=='savepw'){cloudSavePassword();return} if(A==='msend'){cloudSendMessage();return} if(A==='dndon'){cloudSetDnd(false);return} if(A==='dndoff'){cloudSetDnd(true);return} if(A==='saveprivacy'){cloudSavePrivacy();return} if(A==='muteuser'){cloudSetMute();return} if(A==='unmuteuser'){cloudSetMute(true,i);return} if(A==='mopen'){cloudOpenMessage(i);return} if(A==='mreply'){const m=DB.msgs.find(x=>x.id===i);if(m){S.rp={to:m.from,subj:(m.subj.startsWith('Re: ')?'':'Re: ')+m.subj};S.mo=i;render()}return} if(['deluser','cfg','saveedit','scan','pesave','pedel','reset'].includes(A))return toast('Эта административная функция пока не подключена к облаку и отключена, чтобы не создавать локальные изменения.',1); if(A=='adduser'){cloudCreateUser();return;}
+ if(A=='login'){cloudLogin();return} if(A=='logout'){S.m={t:'logout'};render();return} if(A==='logout-confirm'){return} if(A=='blk'){cloudToggleBlock(+i);return} if(A=='saveprof'){cloudSaveProfile();return} if(A=='savepw'){cloudSavePassword();return} if(A==='msend'){cloudSendMessage();return} if(A==='dndon'){cloudSetDnd(false);return} if(A==='dndoff'){cloudSetDnd(true);return} if(A==='saveprivacy'){cloudSavePrivacy();return} if(A==='muteuser'){cloudSetMute();return} if(A==='unmuteuser'){cloudSetMute(true,i);return} if(A==='mopen'){cloudOpenMessage(i);return} if(A==='mreply'){const m=DB.msgs.find(x=>x.id===i);if(m){S.rp={to:m.from,subj:(m.subj.startsWith('Re: ')?'':'Re: ')+m.subj};S.mo=i;render()}return} if(A==='cfg'){cloudSaveSettings(a);return} if(['deluser','saveedit','scan','pesave','pedel','reset'].includes(A))return toast('Эта административная функция пока не подключена к облаку и отключена, чтобы не создавать локальные изменения.',1); if(A=='adduser'){cloudCreateUser();return;}
  if(A=='tab'){osDidNavigate=S.v!==i;S.v=i;S.nt=0}else if(A=='fl')S.f=+i;else if(A=='book')return book(+i);else if(A=='cancel')return cancel(i);
  else if(A=='goto'){S.sel=+i;S.f=pl(+i).f;S.v='map';osDidNavigate=true}
  else if(A=='blk'){if(rk()<1)return toast('Недостаточно прав',1);const id=+i,k=DB.blocked.indexOf(id);k<0?DB.blocked.push(id):DB.blocked.splice(k,1);audit((k<0?'Заблокировано ':'Разблокировано ')+nm(pl(id)));save()}

@@ -1238,3 +1238,6 @@ body.os-delete-dialog-open{overflow:hidden}
 @keyframes os-delete-pop{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:420px){.os-delete-dialog{padding:26px 20px 22px}.os-delete-dialog-actions{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.os-delete-dialog-overlay,.os-delete-dialog{animation:none}.os-delete-dialog-actions button{transition:none}}
+
+/* OfficeSpace 6.0 — cloud settings */
+.os-settings-note{margin:12px 0 0;color:var(--mu);font-size:12px;line-height:1.6}
