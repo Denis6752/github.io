@@ -1244,3 +1244,7 @@ body.os-delete-dialog-open{overflow:hidden}
 
 /* OfficeSpace 6.1 — protected blocking dialog */
 .os-block-dialog{max-width:470px;padding:29px;text-align:left;border-radius:20px}.os-block-dialog h2{font-size:21px}.os-block-dialog>p{color:var(--mu);line-height:1.6}.os-block-symbol{display:grid;place-items:center;width:56px;height:56px;background:color-mix(in srgb,var(--no) 15%,var(--card));border-radius:16px;font-size:26px;margin-bottom:17px}.os-block-label{display:flex;flex-direction:column;gap:9px;font-weight:700;margin-top:18px}.os-block-label textarea{width:100%;min-height:105px}.os-block-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}.os-block-actions .btn{min-height:45px}.nt p.u{border-left:3px solid var(--ac);background:color-mix(in srgb,var(--ac) 8%,var(--card))}
+
+/* 6.1.1: guaranteed visible, dismissible block dialog */
+body>.mo.os-global-dialog{position:fixed!important;inset:0!important;display:flex!important;align-items:center!important;justify-content:center!important;z-index:1000000!important;padding:18px!important;background:rgba(5,9,27,.72)!important;backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+body>.mo.os-global-dialog>.os-block-dialog{display:block!important;position:relative!important;z-index:1!important;visibility:visible!important;opacity:1!important;transform:none!important;width:min(470px,100%)!important;max-height:calc(100dvh - 36px);overflow:auto;background:var(--card)!important;color:var(--tx)!important;box-shadow:0 25px 80px rgba(0,0,0,.4)}

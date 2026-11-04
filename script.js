@@ -408,6 +408,11 @@ function render(){
  const navIcon=(key)=>`<svg class="os-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${navPaths[key]||navPaths.map}</svg>`;
  const title=(TT[S.v]||TT.map)[0];
  $('#app').innerHTML=`<header class="os-sidebar"><div class="os-brand os-brand-identity" aria-label="OfficeSpace — платформа управления офисом"><span class="os-brand-emblem" aria-hidden="true"><svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="50" height="50" rx="15" fill="url(#osBrandGradient)"/><path d="M16 21.5 28 14l12 7.5v13L28 42l-12-7.5v-13Z" stroke="white" stroke-width="2.5" stroke-linejoin="round"/><path d="m16 21.5 12 7.4 12-7.4M28 29v13" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="40.5" cy="15.5" r="3" fill="#D2CAFF"/><defs><linearGradient id="osBrandGradient" x1="5" y1="4" x2="53" y2="53" gradientUnits="userSpaceOnUse"><stop stop-color="#8B85FF"/><stop offset=".56" stop-color="#795BEB"/><stop offset="1" stop-color="#B870D9"/></linearGradient></defs></svg></span><span class="os-brand-copy"><strong>Office<span class="os-brand-space">Space</span></strong><small>УПРАВЛЕНИЕ ОФИСОМ</small></span></div><div class="os-nav-heading"><span class="os-section-label">РАЗДЕЛЫ</span><span class="os-nav-heading-rule" aria-hidden="true"></span></div><nav aria-label="Основные разделы">${tabs.map(t=>`<button type="button" class="os-nav-link ${S.v===t[0]?'on':''}" data-a="tab" data-i="${t[0]}" ${S.v===t[0]?'aria-current="page"':''}><span class="os-nav-icon">${navIcon(t[2])}</span><span class="os-nav-text">${t[1]}</span>${t[0]==='msg'&&um?`<span class="os-nav-count">${um}</span>`:''}</button>`).join('')}</nav><div class="os-sidebar-bottom"><div class="os-section-label">АККАУНТ</div><button class="os-profile ${S.v==='acc'?'on':''}" data-a="tab" data-i="acc"><span class="os-profile-avatar">${osAvatarMarkup(u.name.split(' ').map(x=>x[0]).slice(0,2).join(''))}</span><span><b>${u.name}</b><small>${RN[u.role]}</small></span><span>⚙</span></button><div class="os-bottom-actions"><button data-a="theme" class="os-bottom-btn" title="Сменить тему">◐ <span>Тема</span></button><button data-a="logout" class="os-bottom-btn" title="Выйти">↪ <span>Выход</span></button></div></div></header><div class="os-shell"><div class="os-topbar"><div class="os-breadcrumb"><strong>${title}</strong></div><div class="os-top-actions"><span class="os-clock">${new Date(now()).toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'})}</span><button class="os-top-icon" data-a="theme" title="Переключить тему">◐</button><button class="os-top-icon" data-a="bell" title="Уведомления">🔔 <span class="os-bell-label">Уведомления</span>${un?`<span class="os-top-badge">${un}</span>`:''}</button><button class="os-top-avatar" data-a="tab" data-i="acc" title="Профиль">${osAvatarMarkup(u.name.split(' ').map(x=>x[0]).slice(0,2).join(''))}</button></div></div>${S.nt?`<div class="nt">${mine.slice(0,14).map(n=>`<p class="${n.r?'':'u'}" data-a="nt" data-i="${DB.nt.indexOf(n)}">${esc(n.t)}<br><small>${new Date(n.at).toLocaleString('ru-RU')}</small></p>`).join('')||'<p>Уведомлений нет</p>'}</div>`:''}<main class="os-content"><div class="os-page-head"><div><h1>${title}</h1><p>${(TT[S.v]||TT.map)[1]}</p></div><div class="os-page-user"><span class="os-status-dot"></span> ${RN[u.role]}</div></div>${{map:vMap,search:vSearch,mine:vMine,all:vAll,stats:vStats,staff:vStaff,sys:vSys,msg:vMsg,acc:vAcc}[S.v]()}<footer class="os-footer">OfficeSpace · Облачная синхронизация Supabase</footer></main></div>${modal()}`;
+ // Keep dialogs outside #app's grid/stacking context so the overlay
+ // cannot cover the page while its dialog is hidden behind other layers.
+ const osDialog=$('#app > .mo');
+ document.querySelectorAll('body > .mo.os-global-dialog').forEach(el=>el.remove());
+ if(osDialog){osDialog.classList.add('os-global-dialog');document.body.appendChild(osDialog)}
  if(staffDraft)for(const [id,value] of Object.entries(staffDraft)){const el=document.getElementById(id);if(el&&value!==null)el.value=value}
 }
 // ===== Supabase cloud integration =====
@@ -899,6 +904,9 @@ document.addEventListener('click',e=>{const a=e.target.closest('[data-a]'),g=e.t
  if(g&&!a){S.sel=+g.dataset.id;S.ec=null;S.dc=0;S.nt=0;return render()}
  if(!a){if(S.nt&&!e.target.closest('.nt')){S.nt=0;render()}return}
  const A=a.dataset.a,i=a.dataset.i;e.preventDefault();
+ if(S.m?.t==='block' && !e.target.closest('.os-block-dialog') && e.target.closest('.os-global-dialog')){
+   S.m=null;render();return;
+ }
  if(A==='savedept'){cloudSaveDepartment(i,a);return}
  if(A==='lounge'){S.m={t:'lounge'};render();return}
  if(A==='all-dates'){S.allDates=!S.allDates;S.allPage=0;render();return}
@@ -1203,3 +1211,8 @@ document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.tar
 
 // Keyboard access to the custom file-picker label.
 document.addEventListener('keydown',e=>{if(e.target.matches('label.os-photo-picker')&&(e.key==='Enter'||e.key===' ')){e.preventDefault();document.getElementById('osAvatarUpload')?.click()}});
+
+// Escape always closes the block dialog, even if a previous request failed.
+document.addEventListener('keydown',e=>{
+ if(e.key==='Escape'&&S.m?.t==='block'){S.m=null;render()}
+});
