@@ -357,7 +357,7 @@ document.addEventListener('click',e=>{const a=e.target.closest('[data-a]'),g=e.t
  else if(A=='logout'){audit('Выход из системы');save();S.uid=0;S.m=null;S.nt=0;try{localStorage.removeItem('officespace_sess')}catch(x){}}
  else if(A=='t1'){sim();off+=36e5}else if(A=='t24'){sim();off+=864e5}else if(A=='t0'){if(SIM){DB=JSON.parse(SIM);SIM=null}off=0;toast('Реальное время и данные восстановлены')}else if(A=='help')S.m={t:'help'};
  else if(A=='bell'){S.nt=!S.nt;if(!S.nt)DB.nt.forEach(n=>n.u==S.uid&&(n.r=1));save()}
- else if(A=='theme'){const r=document.documentElement;let t=r.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');r.dataset.theme=t=='dark'?'light':'dark'}
+ else if(A=='theme'){const r=document.documentElement;let t=r.dataset.theme||'dark';r.dataset.theme=t==='dark'?'light':'dark';try{localStorage.setItem('officespace_theme',r.dataset.theme)}catch(e){}}
  else if(A=='reset'){if(rk()<2)return;try{localStorage.removeItem(KEY)}catch(x){}seed();off=0;SIM=null;save()}
  render()});
 document.addEventListener('change',e=>{const t=e.target,id=t.id;if(!id)return;
