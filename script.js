@@ -116,7 +116,14 @@ const wpl=()=>P.filter(p=>!p.room&&!DB.blocked.includes(p.id));
 function ctrlOld(dateOnly){return`<div class="card ctrl"><label>Дата<input type="date" id="cd" value="${S.d}"></label>${dateOnly?'':`<label>Начало<input type="time" id="cs" step="900" value="${tm(S.s)}"></label><label>Конец<input type="time" id="ce" step="900" value="${tm(S.e)}"></label>`}<span class="mu">${!dateOnly&&S.e>1440?'<b>Ночная бронь: до '+tm(S.e)+' следующего дня.</b> ':''}Правила: от ${DB.cfg.min} мин, до ${DB.cfg.hor} дн. вперёд, без пересечений</span></div>`}
 // Local UI preferences; no Supabase schema changes.
 const osLocalKey=(suffix)=>'os_ui_'+suffix+'_'+String(S.uid||'guest');
-const osHiddenMessages=()=>{try{return JSON.parse(localStorage.getItem(osLocalKey('hidden'))||'[]')}catch(e){return []}};
+// Older browser-local deletions remain hidden on that device.
+// New deletions are stored in Supabase and synchronized across devices.
+const osHiddenMessages=()=>{
+ let legacy=[];
+ try{legacy=JSON.parse(localStorage.getItem(osLocalKey('hidden'))||'[]')}catch(e){}
+ const cloud=DB?.hiddenMessageIds||[];
+ return new Set([...legacy,...cloud].map(String));
+};
 // The cloud profile is the source of truth. Legacy browser avatars are only a fallback
 // until the user explicitly reselects one or uploads a photo.
 const osAvatarBucket='officespace-avatars';
@@ -364,16 +371,17 @@ function vMsg(){
  const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
  const myMute=(DB.mutes||[]).find(m=>m.user_id===me&&(!m.expires_at||new Date(m.expires_at)>new Date()));
  const blocked=x=>{const pref=(DB.privacy||[]).find(p=>p.user_id===x.id);return pref&&(pref.mode==='none'||pref.mode==='admins'&&rk()<1)};
- const all=[...I,...O].filter(m=>!osHiddenMessages().includes(String(m.id))).sort((a,b)=>b.at-a.at),selected=all.find(m=>m.id===S.mo)||null;
+ const hidden=osHiddenMessages();
+ const all=[...I,...O].filter(m=>!hidden.has(String(m.id))).sort((a,b)=>b.at-a.at),selected=all.find(m=>String(m.id)===String(S.mo))||null;
  const listItem=m=>{const incoming=m.to===me,person=uname(incoming?m.from:m.to),initials=person.split(' ').map(x=>x[0]).slice(0,2).join('');return `<button class="thread ${S.mo===m.id?'selected':''} ${incoming&&!m.r?'unread':''}" data-a="mopen" data-i="${m.id}"><span class="thread-avatar">${osAvatarMarkup(initials,incoming?m.from:m.to)}</span><span class="thread-body"><span class="thread-line"><b>${esc(person)}</b><small>${new Date(m.at).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'})}</small></span><span class="thread-subject">${esc(m.subj||m.type)}</span><span class="thread-excerpt">${esc((m.text||'').slice(0,78))}</span></span></button>`};
  const privacy=rk()>=1?`<div class="mess-settings"><h3>Приватность</h3><label>Кто может писать мне<select id="privacyMode"><option value="all" ${DB.myPrivacy==='all'?'selected':''}>Все сотрудники</option><option value="admins" ${DB.myPrivacy==='admins'?'selected':''}>Только администрация и ИТ</option><option value="none" ${DB.myPrivacy==='none'?'selected':''}>Никто</option></select></label><button class="btn sec" data-a="saveprivacy">Сохранить</button></div>`:'';
- return `<div class="os-msg-dnd-shell"><details class="os-msg-dnd"><summary><span>🌙 Режим «Не беспокоить»</span><span class="os-msg-dnd-state">${dndActive()?'Включён':'Выключен'} · Настроить</span></summary>${dndSettings()}</details></div><section class="messenger"><aside class="mess-list"><div class="mess-panel-title"><span>Диалоги</span><span class="mess-count">${all.length}</span></div><div class="mess-filter">Все сообщения <span>· ${I.filter(m=>!m.r).length} непрочитанных</span></div><div class="mess-threads">${all.map(listItem).join('')||'<div class="mess-empty">Сообщений пока нет</div>'}</div></aside><div class="mess-center"><div class="mess-panel-title">${selected?esc(uname(selected.to===me?selected.from:selected.to)):'Переписка'}<span class="mess-online">${selected&&osTelegramHref(DB.users.find(u=>u.id===(selected.to===me?selected.from:selected.to))?.tg)?`<a class="os-telegram-link" target="_blank" rel="noopener noreferrer" href="${osTelegramHref(DB.users.find(u=>u.id===(selected.to===me?selected.from:selected.to))?.tg)}">Написать в Telegram ↗</a>`:'● OfficeSpace'}</span></div>${selected?`<div class="mess-conversation"><div class="mess-date">${new Date(selected.at).toLocaleString('ru-RU')}</div><div class="mess-bubble ${selected.from===me?'outgoing':''}"><span class="mess-bubble-kind">${esc(selected.type||'Сообщение')}</span><h3>${esc(selected.subj)}</h3><p>${esc(selected.text)}</p></div></div><div class="mess-bottom">${selected.to===me&&!myMute?`<button class="btn" data-a="mreply" data-i="${selected.id}">↩ Ответить</button>`:''}<button class="btn sec" data-a="mhide" data-i="${selected.id}" title="Скрыть это сообщение только на данном устройстве">Удалить у себя</button><span>История сообщений синхронизируется через Supabase</span></div>`:'<div class="mess-placeholder"><span class="mess-placeholder-icon">✉</span><h2>Выберите сообщение</h2><p>Здесь появится переписка с сотрудниками</p></div>'}</div><aside class="mess-compose"><div class="mess-panel-title">Новое сообщение</div><div class="mess-compose-content">${myMute?`<p class="mu">🔕 Отправка сообщений ограничена${myMute.expires_at?' до '+new Date(myMute.expires_at).toLocaleString('ru-RU'):''}.</p>`:''}<div class="mess-fields"><label>Получатель<select id="mto" ${myMute?'disabled':''}><option value="">Выберите сотрудника</option>${peers.map(x=>`<option value="${esc(x.id)}" ${rp.to===x.id?'selected':''} ${blocked(x)?'disabled':''}>${esc(x.name)}${blocked(x)?' · входящие закрыты':''}</option>`).join('')}</select></label><label>Тема<input id="msj" maxlength="200" value="${esc(rp.subj||'')}" placeholder="Тема сообщения" ${myMute?'disabled':''}></label><label>Сообщение<textarea id="mtx" rows="7" maxlength="10000" placeholder="Напишите сообщение..." ${myMute?'disabled':''}></textarea></label><button class="btn" data-a="msend" ${myMute?'disabled':''}>Отправить сообщение ↗</button></div>${privacy}</div></aside></section>`;
+ return `<div class="os-msg-dnd-shell"><details class="os-msg-dnd"><summary><span>🌙 Режим «Не беспокоить»</span><span class="os-msg-dnd-state">${dndActive()?'Включён':'Выключен'} · Настроить</span></summary>${dndSettings()}</details></div><section class="messenger"><aside class="mess-list"><div class="mess-panel-title"><span>Диалоги</span><span class="mess-count">${all.length}</span></div><div class="mess-filter">Все сообщения <span>· ${I.filter(m=>!m.r&&!hidden.has(String(m.id))).length} непрочитанных</span></div><div class="mess-threads">${all.map(listItem).join('')||'<div class="mess-empty">Сообщений пока нет</div>'}</div></aside><div class="mess-center"><div class="mess-panel-title">${selected?esc(uname(selected.to===me?selected.from:selected.to)):'Переписка'}<span class="mess-online">${selected&&osTelegramHref(DB.users.find(u=>u.id===(selected.to===me?selected.from:selected.to))?.tg)?`<a class="os-telegram-link" target="_blank" rel="noopener noreferrer" href="${osTelegramHref(DB.users.find(u=>u.id===(selected.to===me?selected.from:selected.to))?.tg)}">Написать в Telegram ↗</a>`:'● OfficeSpace'}</span></div>${selected?`<div class="mess-conversation"><div class="mess-date">${new Date(selected.at).toLocaleString('ru-RU')}</div><div class="mess-bubble ${selected.from===me?'outgoing':''}"><span class="mess-bubble-kind">${esc(selected.type||'Сообщение')}</span><h3>${esc(selected.subj)}</h3><p>${esc(selected.text)}</p></div></div><div class="mess-bottom">${selected.to===me&&!myMute?`<button class="btn" data-a="mreply" data-i="${selected.id}">↩ Ответить</button>`:''}<button class="btn sec" data-a="mhide" data-i="${selected.id}" title="Скрыть это сообщение у себя на всех устройствах">Удалить у себя</button><span>История сообщений синхронизируется через Supabase</span></div>`:'<div class="mess-placeholder"><span class="mess-placeholder-icon">✉</span><h2>Выберите сообщение</h2><p>Здесь появится переписка с сотрудниками</p></div>'}</div><aside class="mess-compose"><div class="mess-panel-title">Новое сообщение</div><div class="mess-compose-content">${myMute?`<p class="mu">🔕 Отправка сообщений ограничена${myMute.expires_at?' до '+new Date(myMute.expires_at).toLocaleString('ru-RU'):''}.</p>`:''}<div class="mess-fields"><label>Получатель<select id="mto" ${myMute?'disabled':''}><option value="">Выберите сотрудника</option>${peers.map(x=>`<option value="${esc(x.id)}" ${rp.to===x.id?'selected':''} ${blocked(x)?'disabled':''}>${esc(x.name)}${blocked(x)?' · входящие закрыты':''}</option>`).join('')}</select></label><label>Тема<input id="msj" maxlength="200" value="${esc(rp.subj||'')}" placeholder="Тема сообщения" ${myMute?'disabled':''}></label><label>Сообщение<textarea id="mtx" rows="7" maxlength="10000" placeholder="Напишите сообщение..." ${myMute?'disabled':''}></textarea></label><button class="btn" data-a="msend" ${myMute?'disabled':''}>Отправить сообщение ↗</button></div>${privacy}</div></aside></section>`;
 }
 function muteManagement(){if(rk()<1)return '';const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');const targets=DB.users.filter(u=>u.id!==S.uid&&(rk()>1?u.role!=='it':u.role==='user'));return `<div class="card os-mute-management"><h2>🔕 Ограничения сообщений</h2><p class="mu">Администрация может ограничивать сотрудников; ИТ — сотрудников и администрацию. Брони остаются доступны.</p><div class="ctrl"><label>Сотрудник<select id="muteUser">${targets.map(u=>`<option value="${esc(u.id)}">${esc(u.name)} · ${esc(RN[u.role])}</option>`).join('')}</select></label><label>Срок<select id="muteDuration"><option value="30">30 минут</option><option value="60">1 час</option><option value="1440">24 часа</option><option value="10080">7 дней</option><option value="0">Бессрочно</option></select></label><label>Причина<input id="muteReason" maxlength="250" placeholder="Причина ограничения"></label><button class="btn" data-a="muteuser" ${targets.length?'':'disabled'}>Заглушить</button></div><h3>Активные ограничения</h3>${(DB.mutes||[]).filter(m=>!m.expires_at||new Date(m.expires_at)>new Date()).filter(m=>targets.some(u=>u.id===m.user_id)).map(m=>`<div class="it"><span>${esc(uname(m.user_id))} · ${m.expires_at?new Date(m.expires_at).toLocaleString('ru-RU'):'Бессрочно'} · ${esc(m.reason||'Без причины')}</span><button class="btn sec" data-a="unmuteuser" data-i="${esc(m.user_id)}">Снять</button></div>`).join('')||'<p class="mu">Активных ограничений нет</p>'}</div>`}
 
 function render(){
  buildP();sweep();if(!S.uid)return loginView();fixT();
- const u=DB.users.find(x=>x.id==S.uid),R=RK[u.role],um=(DB.msgs||[]).filter(m=>m.to==S.uid&&!m.r).length;
+ const u=DB.users.find(x=>x.id==S.uid),R=RK[u.role],um=(DB.msgs||[]).filter(m=>m.to==S.uid&&!m.r&&!osHiddenMessages().has(String(m.id))).length;
  if(R<2){S.edit=false;S.ec=null;S.dc=0;}
  const base=[['map','Карта офиса','map'],['search','Поиск мест','search'],['mine','Мои бронирования','calendar-days']];
  const tabs=R===0?[...base,['msg','Сообщения','message-circle']]:[...base,['all','Все бронирования','list-checks'],['stats','Аналитика','chart-no-axes-column'],['staff','Сотрудники','users'],['msg','Сообщения','message-circle'],...(R>1?[['sys','Система','settings']]:[])];
@@ -413,7 +421,7 @@ async function cloudReadAllBookings(){
  return {data:rows,error:null};
 }
 async function cloudFetch(){
- const [pr,wr,br,mr,sr,privacyResult,mutesResult,dndResult]=await Promise.all([
+ const [pr,wr,br,mr,sr,privacyResult,mutesResult,dndResult,hiddenResult]=await Promise.all([
   (async()=>{const q=await sb.from('profiles').select('id,full_name,department,phone,role,email,telegram_username,avatar_path,avatar_preset').order('full_name');if(q.error?.code==='42703'||/telegram_username/.test(q.error?.message||'')){return sb.from('profiles').select('id,full_name,department,phone,role,email').order('full_name')}return q})(),
   sb.from('workplaces').select('*').eq('is_active',true).order('id'),
   cloudReadAllBookings(),
@@ -421,14 +429,20 @@ async function cloudFetch(){
   sb.from('office_settings').select('*').eq('id',1).maybeSingle(),
   sb.from('message_privacy').select('user_id,mode'),
   sb.from('message_mutes').select('user_id,expires_at,reason'),
-  sb.from('message_dnd').select('until_at').eq('user_id',cloudUser.id).maybeSingle()
+  sb.from('message_dnd').select('until_at').eq('user_id',cloudUser.id).maybeSingle(),
+  sb.from('message_hidden').select('message_id').eq('user_id',cloudUser.id)
  ]);
- for(const x of [pr,wr,br,mr,sr,privacyResult,mutesResult,dndResult])if(x.error)throw x.error;
+ for(const x of [pr,wr,br,mr,sr,privacyResult,mutesResult,dndResult,hiddenResult]){
+  if(x.error){
+   if(x===hiddenResult)throw new Error('Сначала выполните SQL для удаления сообщений (message_hidden): '+cloudError(x.error));
+   throw x.error;
+  }
+ }
  osTelegramColumnAvailable=(pr.data||[]).some(x=>Object.prototype.hasOwnProperty.call(x,'telegram_username'));
  DB={users:(pr.data||[]).map(x=>({id:x.id,name:x.full_name||'Сотрудник',dep:x.department||'—',phone:x.phone||'',email:x.email||(x.id===cloudUser.id?(cloudUser.email||''):''),tg:x.telegram_username||'',avatarPath:x.avatar_path||null,avatarPreset:Number.isInteger(x.avatar_preset)?x.avatar_preset:null,role:x.role})),
   blocked:(wr.data||[]).filter(x=>x.is_blocked).map(x=>x.id),
   bk:(br.data||[]).map(x=>({id:x.id,uid:x.user_id,pid:x.workplace_id,d:x.booking_date,s:x.start_minute,e:x.end_minute,st:x.status})),
-  dndUntil:dndResult.data?.until_at||null,privacy:privacyResult.data||[],myPrivacy:(privacyResult.data||[]).find(x=>x.user_id===cloudUser.id)?.mode||'all',mutes:mutesResult.data||[],nt:[],log:[],msgs:(mr.data||[]).map(x=>({id:x.id,from:x.sender_id,to:x.recipient_id,type:x.message_type,subj:x.subject,text:x.body,at:new Date(x.created_at).getTime(),r:x.is_read})),mid:0,cfg:{min:sr.data?.min_duration_minutes||30,hor:sr.data?.booking_horizon_days||14,ns:sr.data?.no_show_grace_minutes||30},id:1,pe:{},pn:[],pid:200};
+  hiddenMessageIds:(hiddenResult.data||[]).map(x=>String(x.message_id)),dndUntil:dndResult.data?.until_at||null,privacy:privacyResult.data||[],myPrivacy:(privacyResult.data||[]).find(x=>x.user_id===cloudUser.id)?.mode||'all',mutes:mutesResult.data||[],nt:[],log:[],msgs:(mr.data||[]).map(x=>({id:x.id,from:x.sender_id,to:x.recipient_id,type:x.message_type,subj:x.subject,text:x.body,at:new Date(x.created_at).getTime(),r:x.is_read})),mid:0,cfg:{min:sr.data?.min_duration_minutes||30,hor:sr.data?.booking_horizon_days||14,ns:sr.data?.no_show_grace_minutes||30},id:1,pe:{},pn:[],pid:200};
  (wr.data||[]).forEach(x=>{DB.pe[x.id]={f:x.floor,r:x.row_no,c:x.col_no,zone:x.zone,t:x.title,eq:x.equipment||[],room:x.is_room?1:0,name:x.is_room?`Переговорная №${x.id-150}`:undefined,cap:x.capacity||undefined,del:!x.is_active}});
  await osRefreshAvatarLinks(DB.users);
  const me=DB.users.find(x=>x.id===cloudUser.id);if(!me)throw new Error('Профиль пользователя не найден. Проверьте trigger handle_new_user и таблицу profiles.');
@@ -440,6 +454,7 @@ async function cloudFetch(){
   if(incoming.length&&!dndActive()&&!document.hidden)toast(incoming.length===1?'💬 Новое сообщение от '+uname(incoming[0].from):'💬 Новых сообщений: '+incoming.length);
  }
  knownMessageIds=current;
+ if(S.mo!==null&&osHiddenMessages().has(String(S.mo)))S.mo=null;
 }
 function cloudEditing(){const a=document.activeElement;return !!(a&&['INPUT','TEXTAREA','SELECT'].includes(a.tagName)&&a.closest('#app'))}
 async function cloudRefresh(){
@@ -458,6 +473,7 @@ async function cloudSubscribe(){
   .on('postgres_changes',{event:'*',schema:'public',table:'workplaces'},()=>cloudRefresh())
   .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},()=>cloudRefresh())
   .on('postgres_changes',{event:'*',schema:'public',table:'office_messages'},()=>cloudRefresh())
+  .on('postgres_changes',{event:'INSERT',schema:'public',table:'message_hidden',filter:'user_id=eq.'+cloudUser.id},()=>cloudRefresh())
   .on('postgres_changes',{event:'*',schema:'public',table:'message_mutes'},()=>cloudRefresh())
   .on('postgres_changes',{event:'*',schema:'public',table:'message_privacy'},()=>cloudRefresh())
   .on('postgres_changes',{event:'*',schema:'public',table:'message_dnd'},()=>cloudRefresh())
@@ -725,6 +741,23 @@ async function cloudSendMessage(){
  if(error){if(btn)btn.disabled=false;return toast('Не удалось отправить: '+cloudError(error),1)}
  S.rp=null;await cloudFetch();render();toast('Сообщение отправлено');
 }
+// "Удалить у себя" is a per-user tombstone. The original message is kept for the other party.
+async function cloudHideMessage(id,button){
+ if(!cloudUser)return toast('Войдите в аккаунт',1);
+ const message=DB.msgs.find(x=>String(x.id)===String(id));
+ if(!message||![message.from,message.to].includes(cloudUser.id))return toast('Сообщение не найдено',1);
+ if(!confirm('Удалить это сообщение у себя на всех устройствах? У собеседника оно сохранится.'))return;
+ if(button?.disabled)return;
+ if(button)button.disabled=true;
+ try{
+  const {error}=await sb.from('message_hidden').upsert({user_id:cloudUser.id,message_id:String(id)},{onConflict:'user_id,message_id',ignoreDuplicates:true});
+  if(error)throw error;
+  DB.hiddenMessageIds=[...new Set([...(DB.hiddenMessageIds||[]),String(id)])];
+  if(String(S.mo)===String(id))S.mo=null;
+  render();
+  toast('Сообщение удалено у вас на всех устройствах');
+ }catch(error){toast('Не удалось удалить сообщение: '+cloudError(error),1);if(button?.isConnected)button.disabled=false}
+}
 async function cloudOpenMessage(id){
  const m=DB.msgs.find(x=>x.id===id);if(!m)return;
  S.mo=S.mo===id?null:id;
@@ -741,7 +774,7 @@ document.addEventListener('click',e=>{const a=e.target.closest('[data-a]'),g=e.t
  if(A==='all-prev'){S.allPage=Math.max(0,(S.allPage||0)-1);render();return}
  if(A==='all-next'){S.allPage=(S.allPage||0)+1;render();return}
  if(A==='zone'){S.zone=i;S.sel=null;render();return}
- if(A==='mhide'){if(!confirm('Скрыть сообщение в этом браузере? На других устройствах оно останется.'))return;const hidden=osHiddenMessages();hidden.push(String(i));localStorage.setItem(osLocalKey('hidden'),JSON.stringify(hidden));S.mo=null;render();toast('Сообщение скрыто на этом устройстве');return}
+ if(A==='mhide'){cloudHideMessage(i,a);return}
  if(A==='avatarpick'){const index=Number(i);if(!Number.isInteger(index)||index<0||index>=osDevAvatarThemes.length)return;osSaveAvatarPreset(index);return}
  if(A==='avatarclear'){osClearAvatar();return}
  if(A==='auth-visibility'){const pw=$('#pw');if(pw){pw.type=pw.type==='password'?'text':'password';a.setAttribute('aria-pressed',String(pw.type==='text'));a.setAttribute('aria-label',pw.type==='text'?'Скрыть пароль':'Показать пароль')}return}
