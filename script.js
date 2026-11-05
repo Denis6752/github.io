@@ -1,4 +1,4 @@
-// ===== OfficeSpace 6.6 — private directory, masked bookings, sanitized Realtime =====
+// ===== OfficeSpace Coursework — cloud workplace editor and protected staff deletion =====
 // Заголовки страниц и карточка пользователя в шапке раздела
 const TT={map:['Карта офиса','Выберите дату и время, затем нажмите на свободное место'],search:['Умный поиск','Подберите место по оборудованию, зоне и числу мест рядом'],mine:['Мои бронирования','Предстоящие и прошедшие брони'],all:['Все бронирования','Просмотр и управление бронями сотрудников'],stats:['Аналитика','Загрузка офиса и ключевые показатели'],staff:['Сотрудники и права','Учётные записи, роли и матрица доступа'],sys:['Система','Параметры правил, журнал аудита и состояние'],msg:['Сообщения','Внутренние сообщения без мессенджера'],acc:['Настройки аккаунта','Профиль, контакты и пароль']};
 const pageHead=()=>{const t=TT[S.v]||TT.map,u=DB.users.find(x=>x.id==S.uid);return`<div class="ph"><div><h1>${t[0]}</h1><p>${t[1]}</p></div><div class="who"><span class="av">${u.name.split(' ').map(w=>w[0]).slice(0,2).join('')}</span><div><b>${u.name}</b><small>${RN[u.role]} · ${u.dep}</small></div></div></div>`};
@@ -89,10 +89,6 @@ function sweep(){let ch=0;const n=now();DB.bk.forEach(b=>{if(b.st=='confirmed'){
  if(n>a+DB.cfg.ns*6e4){b.st='noshow';note(b.uid,'Бронь не подтверждена — место освобождено: '+nm(pl(b.pid))+' ('+fmtD(b.d)+', '+tm(b.s)+')');ch=1}
  else if(!b.rem&&a>n&&a-n<=18e5){b.rem=1;note(b.uid,'Скоро начало брони: '+nm(pl(b.pid))+' в '+tm(b.s));ch=1}}
  else if(b.st=='checked'&&n>ts(b.d,b.e)){b.st='done';ch=1}});if(ch)save();return ch}
-function qr(seed){let h=0;for(const c of seed)h=(h*31+c.charCodeAt(0))>>>0;let s=h||1;const R=()=>(s=(s*1103515245+12345)>>>0)/4294967296;let r='';
- for(let y=0;y<21;y++)for(let x=0;x<21;x++){let on=null;for(const[ox,oy]of[[0,0],[14,0],[0,14]]){const dx=x-ox,dy=y-oy;if(dx>=0&&dx<7&&dy>=0&&dy<7)on=dx==0||dx==6||dy==0||dy==6||(dx>=2&&dx<=4&&dy>=2&&dy<=4)}
-  if(on===null)on=R()<.5;if(on)r+=`<rect x="${x}" y="${y}" width="1" height="1"/>`}
- return`<svg viewBox="-1 -1 23 23" width="170" height="170"><rect x="-1" y="-1" width="23" height="23" fill="#fff"/><g fill="#000">${r}</g></svg>`}
 function mapSVG(){
  const zone=(x,w,title,sub,kind)=>`<g class="floor-zone ${kind}"><rect x="${x}" y="43" width="${w}" height="391" rx="18"/><text class="floor-zone-title" x="${x+18}" y="73">${title}</text><text class="floor-zone-sub" x="${x+18}" y="94">${sub}</text></g>`;
  const zones=zone(16,288,'ОБЩАЯ ЗОНА','Открытое пространство','general')+zone(310,380,'ТИХАЯ ЗОНА','Для сосредоточенной работы','quiet')+zone(696,288,'КОМАНДНАЯ ЗОНА','Работа вместе','team');
@@ -112,20 +108,23 @@ const clean=s=>String(s||'').replace(/[<>"&]/g,'').trim();
 const TYPES=()=>[...new Set(['Обычное','Два монитора','Ноутбук','Тихая зона','Командная работа','Для особых потребностей',...P.filter(p=>!p.room).map(p=>p.t)])];
 function editPanel(){
  const p=S.sel?pl(S.sel):null;
- if(!p)return'<h2>✏️ Редактирование карты</h2><div class="hint">Выберите существующее рабочее место или переговорную на карте, чтобы изменить его параметры. Добавление новых мест отключено.</div>';
+ if(!p){
+   const retired=Object.values(GONE).sort((a,b)=>a.id-b.id);
+   return `<h2>✏️ Редактирование карты</h2><div class="hint">Выберите место или переговорную на карте. Изменения сохраняются в Supabase.</div>${retired.length?`<h3>Отключённые места (${retired.length})</h3><div class="os-retired-list">${retired.map(q=>`<div class="it"><span>${osAttr(nm(q))} · ${q.f} этаж</span><button class="btn sec" type="button" data-a="perestore" data-i="${q.id}">Восстановить</button></div>`).join('')}</div>`:''}`;
+  }
  const room=!!p.room,cur=p.t,ty=room?['Переговорная']:TYPES(),cu=p.eq.map(x=>x.toLowerCase()),oth=p.eq.filter(x=>!EQL.includes(x.toLowerCase()));
- return`<h2>✏️ ${nm(p)}</h2><div class="row"><span>Расположение</span><b>Этаж ${p.f} · ${p.zone}</b></div>
+ return`<h2>✏️ ${osAttr(nm(p))}</h2><div class="row"><span>Расположение</span><b>Этаж ${p.f} · ${p.zone}</b></div>
 <div style="display:flex;flex-direction:column;gap:14px;margin-top:14px">
-<label class="fl2">${room?'Название комнаты':'Номер / название'}<input id="pe_l" value="${room?p.name:(p.label||'')}" placeholder="${room?'Переговорная №1':'по умолчанию — номер места'}"></label>
-<label class="fl2">Тип<select id="pe_t">${ty.map(t=>`<option ${t==cur?'selected':''}>${t}</option>`).join('')}</select></label>
+<label class="fl2">${room?'Название комнаты':'Номер / название'}<input id="pe_l" value="${osAttr(room?p.name:(p.label||''))}" placeholder="${room?'Переговорная №1':'по умолчанию — номер места'}"></label>
+<label class="fl2">Тип<select id="pe_t">${ty.map(t=>`<option ${t==cur?'selected':''}>${osAttr(t)}</option>`).join('')}</select></label>
 ${room?`<label class="fl2">Вместимость (человек)<input id="pe_c" type="number" min="1" max="100" value="${p.cap}"></label>`:'<label class="fl2">Или свой тип<input id="pe_tc" placeholder="например, Стойка для звонков"></label>'}
 <div><div class="cl">Оборудование</div><div class="chs">${EQL.map(e=>`<label class="ck"><input type="checkbox" class="peq" value="${e}" ${cu.includes(e)?'checked':''}>${e}</label>`).join('')}</div></div>
-<label class="fl2">Другое оборудование (через запятую)<input id="pe_o" value="${oth.join(', ')}"></label>
-<label class="fl2">Примечание<input id="pe_d" value="${p.desc||''}" placeholder="например, у окна"></label>
-<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-a="pesave" data-i="${p.id}">Сохранить изменения</button>${room?'':`<button class="btn red" data-a="pedel" data-i="${p.id}">${S.dc==p.id?'Подтвердить удаление':'Удалить'}</button>`}</div></div>`}
+<label class="fl2">Другое оборудование (через запятую)<input id="pe_o" value="${osAttr(oth.join(', '))}"></label>
+<label class="fl2">Примечание<input id="pe_d" value="${osAttr(p.desc||'')}" placeholder="например, у окна"></label>
+<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-a="pesave" data-i="${p.id}">Сохранить изменения</button>${room?'':`<button class="btn red" data-a="pedel" data-i="${p.id}">Отключить место</button>`}</div></div>`}
 function panel(){if(S.edit&&rk()>1)return editPanel();const p=S.sel&&pl(S.sel);if(!p)return'<div class="hint">👆 Нажмите на рабочее место или переговорную на плане</div>';const s=st(p.id),adm=rk()>=1;
  const lab={free:'Свободно',busy:'Занято',blk:'Заблокировано',me:'Ваша бронь'}[s.k];
- return`<h2>${nm(p)}</h2><div class="row"><span>Этаж</span><b>${p.f}</b></div><div class="row"><span>Зона</span><b>${p.zone}</b></div><div class="row"><span>Тип</span><b>${p.t}</b></div><div class="row"><span>Оборудование</span><b>${p.eq.join(', ')||'—'}${p.room?' · '+p.cap+' мест':''}</b></div>${p.desc?`<div class="row"><span>Примечание</span><b>${p.desc}</b></div>`:''}<div class="row"><span>Дата</span><b>${fmtD(S.d)}</b></div><div class="row"><span>Время</span><b>${tm(S.s)}–${tm(S.e)}</b></div><div class="row"><span>Статус</span><b>${lab}${adm&&s.b?' · '+uname(s.b.uid):''}</b></div>${rk()>1?`<div class="row"><span>QR-токен (ИТ)</span><b>OS-${p.id}</b></div>`:''}
+ return`<h2>${nm(p)}</h2><div class="row"><span>Этаж</span><b>${p.f}</b></div><div class="row"><span>Зона</span><b>${p.zone}</b></div><div class="row"><span>Тип</span><b>${p.t}</b></div><div class="row"><span>Оборудование</span><b>${p.eq.join(', ')||'—'}${p.room?' · '+p.cap+' мест':''}</b></div>${p.desc?`<div class="row"><span>Примечание</span><b>${p.desc}</b></div>`:''}<div class="row"><span>Дата</span><b>${fmtD(S.d)}</b></div><div class="row"><span>Время</span><b>${tm(S.s)}–${tm(S.e)}</b></div><div class="row"><span>Статус</span><b>${lab}${adm&&s.b?' · '+uname(s.b.uid):''}</b></div>
  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn" data-a="book" data-i="${p.id}" ${s.k!='free'?'disabled':''}>Забронировать</button>${adm?`<button class="btn sec" data-a="blk" data-i="${p.id}">${s.k=='blk'?'Разблокировать':'Заблокировать'}</button>`:''}${adm&&s.b?`<button class="btn red" data-a="cancel" data-i="${s.b.id}">Отменить бронь</button>`:''}</div>`}
 const wpl=()=>P.filter(p=>!p.room&&!DB.blocked.includes(p.id));
 function ctrlOld(dateOnly){return`<div class="card ctrl"><label>Дата<input type="date" id="cd" value="${S.d}"></label>${dateOnly?'':`<label>Начало<input type="time" id="cs" step="900" value="${tm(S.s)}"></label><label>Конец<input type="time" id="ce" step="900" value="${tm(S.e)}"></label>`}<span class="mu">${!dateOnly&&S.e>1440?'<b>Ночная бронь: до '+tm(S.e)+' следующего дня.</b> ':''}Правила: от ${DB.cfg.min} мин, до ${DB.cfg.hor} дн. вперёд, без пересечений</span></div>`}
@@ -232,7 +231,7 @@ function vSearch(){const q=S.q,R=results(),o=(a,v)=>a.map(x=>`<option ${x==v?'se
  return`${ctrl()}<div class="card os-search-filters"><div class="os-search-filters-heading"><div><span class="os-search-filters-eyebrow">ПАРАМЕТРЫ ПОИСКА</span><h2>Подберите рабочее место</h2><p>Выберите тип пространства и необходимое оборудование</p></div><span class="os-search-filters-counter">${R.length} вариантов</span></div><div class="os-search-fields"><label for="qfloor"><span class="os-search-field-label">Этаж</span><select id="qfloor"><option value="">Все этажи</option>${[1,2,3].map(f=>`<option value="${f}" ${Number(q.floor)===f?'selected':''}>${f}-й этаж</option>`).join('')}</select></label><label for="qt"><span class="os-search-field-label">Тип места</span><select id="qt"><option value="">Все типы мест</option>${o([...new Set(P.map(p=>p.t))],q.t)}</select></label><label for="qe"><span class="os-search-field-label">Оборудование</span><select id="qe"><option value="">Любое оборудование</option>${o([...new Set(P.flatMap(p=>p.eq.map(e=>e.toLowerCase())))],q.eq)}</select></label></div></div>
  <div class="card"><h2>Подходящие варианты: ${R.length}</h2>${R.slice(0,30).map(p=>`<div class="it"><div><b>${nm(p)}</b> · этаж ${p.f} · ${p.zone}<br><small>${p.t} — ${p.eq.join(', ')}</small></div><div style="display:flex;gap:6px"><button class="btn sec" data-a="goto" data-i="${p.id}">На карте</button><button class="btn" data-a="book" data-i="${p.id}">Забронировать</button></div></div>`).join('')||'<div class="hint">Ничего не найдено — измените условия</div>'}${R.length>30?`<p class="mu">…и ещё ${R.length-30}</p>`:''}</div>`}
 function vMine(){const L=DB.bk.filter(b=>b.uid==S.uid).sort((a,b)=>ts(b.d,b.s)-ts(a.d,a.s)),up=L.filter(b=>ACT.includes(b.st)&&ts(b.d,b.e)>=now()).reverse(),hi=L.filter(b=>!up.includes(b)).slice(0,25);
- const it=(b,a)=>{const p=pl(b.pid);return`<div class="it"><div><b>${nm(p)}</b> · ${osBookingDateTimeText(b)}<br><small>Этаж ${p.f} · ${p.zone} · ${p.eq.join(', ')}</small></div><div style="display:flex;gap:6px;align-items:center"><span class="chip ${b.st}">${SN[b.st]}</span>${a&&b.st=='confirmed'?`<button class="btn sec" data-a="qr" data-i="${b.id}">📷 QR</button><button class="btn sec" data-a="edit" data-i="${b.id}">Изменить</button><button class="btn red" data-a="cancel" data-i="${b.id}">Отменить</button>`:''}</div></div>`};
+ const it=(b,a)=>{const p=pl(b.pid);return`<div class="it"><div><b>${nm(p)}</b> · ${osBookingDateTimeText(b)}<br><small>Этаж ${p.f} · ${p.zone} · ${p.eq.join(', ')}</small></div><div style="display:flex;gap:6px;align-items:center"><span class="chip ${b.st}">${SN[b.st]}</span>${a&&b.st=='confirmed'?`<button class="btn sec" data-a="edit" data-i="${b.id}">Изменить</button><button class="btn red" data-a="cancel" data-i="${b.id}">Отменить</button>`:''}</div></div>`};
  return`<div class="card"><h2>Предстоящие</h2>${up.map(b=>it(b,1)).join('')||'<div class="hint">Нет предстоящих броней</div>'}</div><div class="card"><h2>История</h2>${hi.map(b=>it(b,0)).join('')||'<div class="hint">Пока пусто</div>'}</div>`}
 function vAll(){
  const all=!!S.allDates,perPage=50;
@@ -259,7 +258,7 @@ function vStats(){const today=ds(new Date(now())),dc={},zc={},pc={};let ca=0,ns=
  const av=wpl().length,wd=[[],[],[],[],[],[],[]];Object.entries(dc).forEach(([d,s])=>{if(d<=today)wd[(new Date(d+'T00:00').getDay()+6)%7].push(s.size/av*100)});
  const avg=wd.map(a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):0),bk=dc[today]?dc[today].size:0,top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1])[0]||['—',0],D=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'],ti=(new Date(now()).getDay()+6)%7;
  return`<div class="kpis"><div class="kpi"><b>${P.filter(p=>!p.room).length}</b><span>всего рабочих мест</span></div><div class="kpi"><b>${bk}</b><span>забронировано сегодня</span></div><div class="kpi"><b>${av-bk}</b><span>свободно</span></div><div class="kpi"><b>${Math.round(bk/av*100)}%</b><span>загрузка офиса</span></div></div>
- <div class="mw"><div class="card"><h2>Использование офиса по дням недели</h2>${avg.map((v,i)=>`<div class="bar"><span ${i==ti?'style="font-weight:800"':''}>${D[i]}</span><div><i style="width:${v}%"></i></div><b>${v}%</b></div>`).join('')}</div><div class="card"><h2>Показатели</h2><div class="row"><span>Популярная зона</span><b>${top(zc)[0]}</b></div><div class="row"><span>Популярное место</span><b>№${top(pc)[0]} (${top(pc)[1]} броней)</b></div><div class="row"><span>Отмен</span><b>${ca}</b></div><div class="row"><span>Не использовано</span><b>${ns} (${Math.round(ns/tot*100)}%)</b></div><div class="row"><span>Заблокировано мест</span><b>${DB.blocked.length}</b></div></div></div>`}
+ <div class="mw"><div class="card"><h2>Использование офиса по дням недели</h2>${avg.map((v,i)=>`<div class="bar"><span ${i==ti?'style="font-weight:800"':''}>${D[i]}</span><div><i style="width:${v}%"></i></div><b>${v}%</b></div>`).join('')}</div><div class="card"><h2>Показатели</h2><div class="row"><span>Популярная зона</span><b>${top(zc)[0]}</b></div><div class="row"><span>Популярное место</span><b>№${top(pc)[0]} (${top(pc)[1]} броней)</b></div><div class="row"><span>Отмен</span><b>${ca}</b></div><div class="row"><span>Не использовано</span><b>${ns} (${tot?Math.round(ns/tot*100):0}%)</b></div><div class="row"><span>Заблокировано мест</span><b>${DB.blocked.length}</b></div></div></div>`}
 function vStaff(){
  const teamSummary=rk()>=1?(()=>{
   const total=DB.users.length;
@@ -276,13 +275,13 @@ function vStaff(){
    </div>
   </section>`;
  })():'';
- return`${teamSummary}${muteManagement()}<div class="card"><h2>Сотрудники и отделы</h2><table><tr><th>ФИО</th><th>Отдел</th>${rk()>1?'<th>Email</th><th>Телефон</th>':''}<th>Роль</th><th>Telegram</th><th></th></tr>${DB.users.map(u=>`<tr><td><span class="os-staff-person"><span class="os-staff-picture">${osAvatarMarkup(u.name.split(' ').map(x=>x[0]).slice(0,2).join(''),u.id)}</span><span>${osAttr(u.name)}</span></span></td><td>${rk()>1?`<div class="os-dept-editor"><input id="dept_${u.id}" type="text" maxlength="100" value="${String(u.dep||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" aria-label="Отдел: ${String(u.name||'Сотрудник').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" /><button class="btn sec" data-a="savedept" data-i="${u.id}" type="button">Сохранить</button></div>`:u.dep}</td>${rk()>1?`<td>${u.email||'—'}</td><td>${u.phone||'—'}</td>`:''}<td>${rk()>1?`<select id="rl_${u.id}" ${u.id==S.uid||u.role=='it'?'disabled title="Роль защищена"':''}>${Object.keys(RN).map(k=>`<option value="${k}" ${k==u.role?'selected':''}>${RN[k]}</option>`).join('')}</select>`:RN[u.role]}</td><td>${osTelegramHref(u.tg)?`<a class="os-telegram-link" href="${osTelegramHref(u.tg)}" target="_blank" rel="noopener noreferrer">@${osTelegramClean(u.tg)}</a>`:'<span class="mu">Не указан</span>'}</td><td>${rk()>1&&u.id!=S.uid&&u.role!='it'?`<button class="btn red" data-a="deluser" data-i="${u.id}">Удалить</button>`:''}</td></tr>`).join('')}</table></div>${rk()>1?`<div class="card"><h2>Регистрация нового пользователя (только ИТ-специалист)</h2><div class="ctrl"><label>ФИО<input id="un"></label><label>Отдел<input id="ud"></label><label>Email<input id="ue" class="em" autocomplete="off" placeholder="name@mail.ru"><small class="eh">Убедитесь в правильности ввода почты</small></label><label>Телефон<input id="up" class="ph" placeholder="+7 747 584 12 30"></label><label>Пароль<input id="upw" placeholder="не менее 6 символов"></label><label>Роль<select id="ur"><option value="user">Сотрудник</option><option value="admin">Администрация</option><option value="it">ИТ-специалист</option></select></label><button class="btn" data-a="adduser">Создать аккаунт</button></div></div>`:'<div class="card mu">🔒 Регистрация новых пользователей доступна только ИТ-специалисту.</div>'}<div class="card"><h2>Матрица прав доступа (RBAC)</h2><table><tr><th>Функция</th><th>Сотрудник</th><th>Администрация</th><th>ИТ</th></tr>${[['Карта, поиск, бронирование, изменение и отмена своих броней, QR',1,1,1],['Просмотр всех броней, отмена чужих броней, блокировка мест',0,1,1],['Аналитика загрузки, добавление сотрудников',0,1,1],['Назначение ролей, удаление пользователей',0,0,1],['Настройка правил, журнал аудита, состояние системы, сброс данных',0,0,1]].map(r=>`<tr><td>${r[0]}</td>${r.slice(1).map(v=>`<td>${v?'✅':'—'}</td>`).join('')}</tr>`).join('')}</table></div>`}
+ return`${teamSummary}${muteManagement()}<div class="card"><h2>Сотрудники и отделы</h2><table><tr><th>ФИО</th><th>Отдел</th>${rk()>=1?'<th>Email</th><th>Телефон</th>':''}<th>Роль</th><th>Telegram</th><th></th></tr>${DB.users.map(u=>`<tr><td><span class="os-staff-person"><span class="os-staff-picture">${osAvatarMarkup(u.name.split(' ').map(x=>x[0]).slice(0,2).join(''),u.id)}</span><span>${osAttr(u.name)}</span></span></td><td>${rk()>1?`<div class="os-dept-editor"><input id="dept_${u.id}" type="text" maxlength="100" value="${String(u.dep||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" aria-label="Отдел: ${String(u.name||'Сотрудник').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" /><button class="btn sec" data-a="savedept" data-i="${u.id}" type="button">Сохранить</button></div>`:u.dep}</td>${rk()>=1?`<td>${osAttr(u.email||'—')}</td><td>${osAttr(u.phone||'—')}</td>`:''}<td>${rk()>1?`<select id="rl_${u.id}" ${u.id==S.uid||u.role=='it'?'disabled title="Роль защищена"':''}>${Object.keys(RN).map(k=>`<option value="${k}" ${k==u.role?'selected':''}>${RN[k]}</option>`).join('')}</select>`:RN[u.role]}</td><td>${osTelegramHref(u.tg)?`<a class="os-telegram-link" href="${osTelegramHref(u.tg)}" target="_blank" rel="noopener noreferrer">@${osTelegramClean(u.tg)}</a>`:'<span class="mu">Не указан</span>'}</td><td>${rk()>1&&u.id!=S.uid&&u.role!='it'?`<button class="btn red" data-a="deluser" data-i="${u.id}">Удалить</button>`:''}</td></tr>`).join('')}</table></div>${rk()>1?`<div class="card"><h2>Регистрация нового пользователя (только ИТ-специалист)</h2><div class="ctrl"><label>ФИО<input id="un"></label><label>Отдел<input id="ud"></label><label>Email<input id="ue" class="em" autocomplete="off" placeholder="name@mail.ru"><small class="eh">Убедитесь в правильности ввода почты</small></label><label>Телефон<input id="up" class="ph" placeholder="+7 747 584 12 30"></label><label>Пароль<input id="upw" type="password" autocomplete="new-password" placeholder="не менее 6 символов"></label><label>Роль<select id="ur"><option value="user">Сотрудник</option><option value="admin">Администрация</option><option value="it">ИТ-специалист</option></select></label><button class="btn" data-a="adduser">Создать аккаунт</button></div></div>`:'<div class="card mu">🔒 Регистрация новых пользователей доступна только ИТ-специалисту.</div>'}<div class="card"><h2>Матрица прав доступа (RBAC)</h2><table><tr><th>Функция</th><th>Сотрудник</th><th>Администрация</th><th>ИТ</th></tr>${[['Карта, поиск, бронирование, изменение и отмена своих броней',1,1,1],['Просмотр всех броней, отмена чужих броней, блокировка мест',0,1,1],['Аналитика загрузки',0,1,1],['Добавление сотрудников и редактирование плана',0,0,1],['Назначение ролей, удаление пользователей',0,0,1],['Настройка правил, журнал аудита, состояние системы, сброс данных',0,0,1]].map(r=>`<tr><td>${r[0]}</td>${r.slice(1).map(v=>`<td>${v?'✅':'—'}</td>`).join('')}</tr>`).join('')}</table></div>`}
 function modal(){const m=S.m;if(!m)return'';
  if(m.t==='logout')return`<div class="mo os-logout-overlay" role="presentation"><div class="md os-logout-dialog" role="dialog" aria-modal="true" aria-labelledby="os-logout-title" aria-describedby="os-logout-desc"><span class="os-logout-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M12 3h6a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-6"/></svg></span><span class="os-logout-kicker">ЗАВЕРШЕНИЕ СЕАНСА</span><h2 id="os-logout-title">Уже уходите?</h2><p id="os-logout-desc">Вы действительно хотите выйти из OfficeSpace?</p><div class="os-logout-actions"><button type="button" class="os-logout-stay" data-a="close">Нет, остаться</button><button type="button" class="os-logout-leave" data-a="logout-confirm" aria-label="Подтвердить выход из аккаунта"><span class="os-logout-progress" aria-hidden="true"></span><span class="os-logout-leave-label">Да, хочу выйти</span></button></div></div></div>`;
 
  if(m.t==='lounge')return`<div class="mo os-lounge-backdrop" role="presentation"><div class="md os-lounge-dialog" role="dialog" aria-modal="true" aria-labelledby="os-lounge-title"><div class="os-lounge-dialog-icon" aria-hidden="true">☕</div><h2 id="os-lounge-title">Зона отдыха</h2><p class="os-lounge-lead">Пространство для перерывов на каждом этаже. <b>Бронирование не требуется.</b></p><div class="os-lounge-features"><div><span>☕</span><span>Кофе-автомат и чайная станция</span></div><div><span>🛋</span><span>Диваны и удобные кресла</span></div><div><span>🚰</span><span>Кулер с питьевой водой</span></div><div><span>🍽</span><span>Микроволновая печь и холодильник</span></div><div><span>📚</span><span>Книги и журналы</span></div></div><button class="btn os-lounge-close" data-a="close" type="button">Понятно, закрыть</button></div></div>`;
- if(m.t=='help')return`<div class="mo"><div class="md" style="max-width:540px;text-align:left"><h2>🕐 Зачем нужна «машина времени»?</h2><p>Это <b>демо-инструмент</b>. Часть функций зависит от времени, и без неё их пришлось бы ждать по-настоящему:</p><ul class="rl"><li><b>Автоосвобождение</b>: если через 30 минут после начала брони нет подтверждения, бронь становится «Не использовано», а место освобождается.</li><li><b>Напоминание</b> за 30 минут до начала.</li><li><b>QR-подтверждение</b>: доступно с −15 до +30 минут от начала брони.</li><li>Завершение броней и ночные брони.</li></ul><p><b>+1 ч / +1 д</b> сдвигают часы сайта вперёд. <b>Сброс</b> возвращает реальное время и откатывает данные к состоянию до симуляции: в демо-режиме изменения не сохраняются, а после перезагрузки страницы всё возвращается как было.</p><div style="text-align:right"><button class="btn" data-a="close">Понятно</button></div></div></div>`;const b=DB.bk.find(x=>x.id==m.i),p=pl(b.pid);
- if(m.t=='qr')return`<div class="mo"><div class="md"><h2>QR-код: ${nm(p)}</h2>${qr('OS-'+p.id+'-'+b.id)}<p class="mu">Демо-код. В системе у каждого места свой токен; подтверждение возможно за 15 мин до начала и до 30 мин после.</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn sec" data-a="tt" data-i="${b.id}">⏱ К началу брони</button><button class="btn" data-a="scan" data-i="${b.id}">Сканировать</button><button class="btn sec" data-a="close">Закрыть</button></div></div></div>`;
+ if(m.t=='help')return`<div class="mo"><div class="md" style="max-width:540px;text-align:left"><h2>🕐 Зачем нужна «машина времени»?</h2><p>Это <b>демо-инструмент</b>. Часть функций зависит от времени, и без неё их пришлось бы ждать по-настоящему:</p><ul class="rl"><li><b>Автоосвобождение</b>: в демонстрационном режиме возможно автоматическое завершение неиспользованной брони.</li><li><b>Напоминание</b> за 30 минут до начала.</li><li>Завершение броней и ночные брони.</li></ul><p><b>+1 ч / +1 д</b> сдвигают часы сайта вперёд. <b>Сброс</b> возвращает реальное время и откатывает данные к состоянию до симуляции: в демо-режиме изменения не сохраняются, а после перезагрузки страницы всё возвращается как было.</p><div style="text-align:right"><button class="btn" data-a="close">Понятно</button></div></div></div>`;const b=DB.bk.find(x=>x.id==m.i),p=pl(b.pid);
+
  return`<div class="mo"><div class="md"><h2>Изменить бронь</h2><p>${nm(p)}, ${fmtD(b.d)}</p><div class="ctrl" style="justify-content:center"><label>Начало<input type="time" id="es" step="900" value="${tm(b.s)}"></label><label>Конец<input type="time" id="ee" step="900" value="${tm(b.e)}"></label></div><br><div style="display:flex;gap:8px;justify-content:center"><button class="btn" data-a="saveedit" data-i="${b.id}">Сохранить</button><button class="btn sec" data-a="close">Отмена</button></div></div></div>`}
 function vSys(){const c=DB.cfg,L=(DB.log||[]).slice(0,40);return`<div class="mw"><div class="card"><h2>⚙️ Параметры бизнес-правил</h2><div class="ctrl"><label>Мин. длительность, мин<input id="c1" type="number" min="15" step="15" value="${c.min}"></label><label>Горизонт, дней<input id="c2" type="number" min="1" max="90" value="${c.hor}"></label><label>Автоосвобождение, мин<input id="c3" type="number" min="5" max="120" value="${c.ns}"></label></div><br><button class="btn" data-a="cfg">Сохранить</button><p class="os-settings-note">Настройки сохраняются в Supabase. Изменять их может только ИТ-специалист.</p><h2 style="margin-top:20px">Состояние системы</h2><div class="row"><span>Пользователей</span><b>${DB.users.length}</b></div><div class="row"><span>Броней в базе</span><b>${DB.bk.length}</b></div><div class="row"><span>Заблокировано мест</span><b>${DB.blocked.length}</b></div><div class="row"><span>Ресурсов (места и переговорные)</span><b>${P.length}</b></div></div><div class="card"><h2>🧾 Журнал аудита</h2>${L.map(l=>`<p style="margin:0;padding:6px 0;border-bottom:1px dashed var(--bd);font-size:13px"><b>${uname(l.u)}</b>: ${l.t}<br><small class="mu">${new Date(l.at).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small></p>`).join('')||'<div class="hint">Журнал пуст. Совершите действие — оно появится здесь</div>'}</div></div>`}
 function loginView(){
@@ -424,7 +423,7 @@ function render(){
  };
  const navIcon=(key)=>`<svg class="os-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${navPaths[key]||navPaths.map}</svg>`;
  const title=(TT[S.v]||TT.map)[0];
- $('#app').innerHTML=`<header class="os-sidebar"><div class="os-brand os-brand-identity" aria-label="OfficeSpace — платформа управления офисом"><span class="os-brand-emblem" aria-hidden="true"><svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="50" height="50" rx="15" fill="url(#osBrandGradient)"/><path d="M16 21.5 28 14l12 7.5v13L28 42l-12-7.5v-13Z" stroke="white" stroke-width="2.5" stroke-linejoin="round"/><path d="m16 21.5 12 7.4 12-7.4M28 29v13" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="40.5" cy="15.5" r="3" fill="#D2CAFF"/><defs><linearGradient id="osBrandGradient" x1="5" y1="4" x2="53" y2="53" gradientUnits="userSpaceOnUse"><stop stop-color="#8B85FF"/><stop offset=".56" stop-color="#795BEB"/><stop offset="1" stop-color="#B870D9"/></linearGradient></defs></svg></span><span class="os-brand-copy"><strong>Office<span class="os-brand-space">Space</span></strong><small>УПРАВЛЕНИЕ ОФИСОМ</small></span></div><div class="os-nav-heading"><span class="os-section-label">РАЗДЕЛЫ</span><span class="os-nav-heading-rule" aria-hidden="true"></span></div><nav aria-label="Основные разделы">${tabs.map(t=>`<button type="button" class="os-nav-link ${S.v===t[0]?'on':''}" data-a="tab" data-i="${t[0]}" ${S.v===t[0]?'aria-current="page"':''}><span class="os-nav-icon">${navIcon(t[2])}</span><span class="os-nav-text">${t[1]}</span>${t[0]==='msg'&&um?`<span class="os-nav-count">${um}</span>`:''}</button>`).join('')}</nav><div class="os-sidebar-bottom"><div class="os-section-label">АККАУНТ</div><button class="os-profile ${S.v==='acc'?'on':''}" data-a="tab" data-i="acc"><span class="os-profile-avatar">${osAvatarMarkup(u.name.split(' ').map(x=>x[0]).slice(0,2).join(''))}</span><span><b>${u.name}</b><small>${RN[u.role]}</small></span><span>⚙</span></button><div class="os-bottom-actions"><button data-a="theme" class="os-bottom-btn" title="Сменить тему">◐ <span>Тема</span></button><button data-a="logout" class="os-bottom-btn" title="Выйти">↪ <span>Выход</span></button></div></div></header><div class="os-shell"><div class="os-topbar"><div class="os-breadcrumb"><strong>${title}</strong></div><div class="os-top-actions"><span class="os-clock">${new Date(now()).toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'})}</span><button class="os-top-icon" data-a="theme" title="Переключить тему">◐</button><button class="os-top-icon" data-a="bell" title="Уведомления">🔔 <span class="os-bell-label">Уведомления</span>${un?`<span class="os-top-badge">${un}</span>`:''}</button><button class="os-top-avatar" data-a="tab" data-i="acc" title="Профиль">${osAvatarMarkup(u.name.split(' ').map(x=>x[0]).slice(0,2).join(''))}</button></div></div>${S.nt?`<div class="nt">${mine.slice(0,14).map(n=>`<p class="${n.r?'':'u'}" data-a="nt" data-i="${DB.nt.indexOf(n)}">${esc(n.t)}<br><small>${new Date(n.at).toLocaleString('ru-RU')}</small></p>`).join('')||'<p>Уведомлений нет</p>'}</div>`:''}<main class="os-content"><div class="os-page-head"><div><h1>${title}</h1><p>${(TT[S.v]||TT.map)[1]}</p></div><div class="os-page-user"><span class="os-status-dot"></span> ${RN[u.role]}</div></div>${{map:vMap,search:vSearch,mine:vMine,all:vAll,stats:vStats,staff:vStaff,sys:vSys,msg:vMsg,acc:vAcc}[S.v]()}<footer class="os-footer">OfficeSpace · Облачная синхронизация Supabase</footer></main></div>${modal()}`;
+ $('#app').innerHTML=`<header class="os-sidebar"><div class="os-brand os-brand-identity" aria-label="OfficeSpace — платформа управления офисом"><span class="os-brand-emblem" aria-hidden="true"><svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="50" height="50" rx="15" fill="url(#osBrandGradient)"/><path d="M16 21.5 28 14l12 7.5v13L28 42l-12-7.5v-13Z" stroke="white" stroke-width="2.5" stroke-linejoin="round"/><path d="m16 21.5 12 7.4 12-7.4M28 29v13" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="40.5" cy="15.5" r="3" fill="#D2CAFF"/><defs><linearGradient id="osBrandGradient" x1="5" y1="4" x2="53" y2="53" gradientUnits="userSpaceOnUse"><stop stop-color="#8B85FF"/><stop offset=".56" stop-color="#795BEB"/><stop offset="1" stop-color="#B870D9"/></linearGradient></defs></svg></span><span class="os-brand-copy"><strong>Office<span class="os-brand-space">Space</span></strong><small>УПРАВЛЕНИЕ ОФИСОМ</small></span></div><div class="os-nav-heading"><span class="os-section-label">РАЗДЕЛЫ</span><span class="os-nav-heading-rule" aria-hidden="true"></span></div><nav aria-label="Основные разделы">${tabs.map(t=>`<button type="button" class="os-nav-link ${S.v===t[0]?'on':''}" data-a="tab" data-i="${t[0]}" ${S.v===t[0]?'aria-current="page"':''}><span class="os-nav-icon">${navIcon(t[2])}</span><span class="os-nav-text">${t[1]}</span>${t[0]==='msg'&&um?`<span class="os-nav-count">${um}</span>`:''}</button>`).join('')}</nav><div class="os-sidebar-bottom"><div class="os-section-label">АККАУНТ</div><button class="os-profile ${S.v==='acc'?'on':''}" data-a="tab" data-i="acc"><span class="os-profile-avatar">${osAvatarMarkup(u.name.split(' ').map(x=>x[0]).slice(0,2).join(''))}</span><span><b>${u.name}</b><small>${RN[u.role]}</small></span><span>⚙</span></button><div class="os-bottom-actions"><button data-a="theme" class="os-bottom-btn" title="Сменить тему">◐ <span>Тема</span></button><button data-a="logout" class="os-bottom-btn" title="Выйти">↪ <span>Выход</span></button></div></div></header><div class="os-shell"><div class="os-topbar"><div class="os-breadcrumb"><strong>${title}</strong></div><div class="os-top-actions"><span class="os-clock">${new Date(now()).toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'})}</span><button class="os-top-icon" data-a="theme" title="Переключить тему">◐</button><button class="os-top-icon" data-a="bell" title="Уведомления">🔔 <span class="os-bell-label">Уведомления</span>${un?`<span class="os-top-badge">${un}</span>`:''}</button><button type="button" class="os-mobile-logout" data-a="logout" aria-label="Выйти из аккаунта" title="Выйти">↪</button><button class="os-top-avatar" data-a="tab" data-i="acc" title="Профиль">${osAvatarMarkup(u.name.split(' ').map(x=>x[0]).slice(0,2).join(''))}</button></div></div>${S.nt?`<div class="nt">${mine.slice(0,14).map(n=>`<p class="${n.r?'':'u'}" data-a="nt" data-i="${DB.nt.indexOf(n)}">${esc(n.t)}<br><small>${new Date(n.at).toLocaleString('ru-RU')}</small></p>`).join('')||'<p>Уведомлений нет</p>'}</div>`:''}<main class="os-content"><div class="os-page-head"><div><h1>${title}</h1><p>${(TT[S.v]||TT.map)[1]}</p></div><div class="os-page-user"><span class="os-status-dot"></span> ${RN[u.role]}</div></div>${{map:vMap,search:vSearch,mine:vMine,all:vAll,stats:vStats,staff:vStaff,sys:vSys,msg:vMsg,acc:vAcc}[S.v]()}<footer class="os-footer">OfficeSpace · Облачная синхронизация Supabase</footer></main></div>${modal()}`;
  // Keep dialogs outside #app's grid/stacking context so the overlay
  // cannot cover the page while its dialog is hidden behind other layers.
  const osDialog=$('#app > .mo');
@@ -469,7 +468,7 @@ async function cloudSaveSettings(button){
  if(raw.some(v=>v===undefined||v==='')||nums.some(n=>!Number.isSafeInteger(n)))
   return toast('Введите целые числа во все три поля',1);
  const [min,hor,ns]=nums;
- if(min<15||min>1440||min%15!==0)return toast('Минимальная длительность: от 15 до 1440 минут, шаг 15',1);
+ if(min<15||min>960||min%15!==0)return toast('Минимальная длительность: от 15 до 960 минут, шаг 15',1);
  if(hor<1||hor>90)return toast('Горизонт бронирования: от 1 до 90 дней',1);
  if(ns<5||ns>120)return toast('Автоосвобождение: от 5 до 120 минут',1);
  osSettingsSaving=true;
@@ -503,7 +502,7 @@ async function cloudReadAllBookings(){
 async function cloudFetch(){
  const [pr,wr,br,mr,sr,privacyResult,mutesResult,dndResult,hiddenResult,notificationsResult]=await Promise.all([
   sb.rpc('office_directory_secure'),
-  sb.from('workplaces').select('*').eq('is_active',true).order('id'),
+  sb.from('workplaces').select('*').order('id'),
   cloudReadAllBookings(),
   sb.from('office_messages').select('*').order('created_at',{ascending:false}).limit(500),
   sb.from('office_settings').select('*').eq('id',1).maybeSingle(),
@@ -521,10 +520,10 @@ async function cloudFetch(){
  }
  osTelegramColumnAvailable=(pr.data||[]).some(x=>Object.prototype.hasOwnProperty.call(x,'telegram_username'));
  DB={users:(pr.data||[]).map(x=>({id:x.id,name:x.full_name||'Сотрудник',dep:x.department||'—',phone:x.phone||'',email:x.email||(x.id===cloudUser.id?(cloudUser.email||''):''),tg:x.telegram_username||'',avatarPath:x.avatar_path||null,avatarPreset:Number.isInteger(x.avatar_preset)?x.avatar_preset:null,role:x.role})),
-  blocked:(wr.data||[]).filter(x=>x.is_blocked).map(x=>x.id),
+  blocked:(wr.data||[]).filter(x=>x.is_blocked&&x.is_active).map(x=>x.id),
   bk:(br.data||[]).map(x=>({id:x.id,uid:x.user_id,pid:x.workplace_id,d:x.booking_date,s:x.start_minute,e:x.end_minute,st:x.status})),
   hiddenMessageIds:(hiddenResult.data||[]).map(x=>String(x.message_id)),dndUntil:dndResult.data?.until_at||null,privacy:privacyResult.data||[],myPrivacy:(privacyResult.data||[]).find(x=>x.user_id===cloudUser.id)?.mode||'all',mutes:mutesResult.data||[],nt:(notificationsResult.data||[]).map(n=>({id:n.id,u:n.user_id,t:n.body,at:new Date(n.created_at).getTime(),r:n.is_read})),log:[],msgs:(mr.data||[]).map(x=>({id:x.id,from:x.sender_id,to:x.recipient_id,type:x.message_type,subj:x.subject,text:x.body,at:new Date(x.created_at).getTime(),r:x.is_read})),mid:0,cfg:{min:sr.data?.min_duration_minutes||30,hor:sr.data?.booking_horizon_days||14,ns:sr.data?.no_show_grace_minutes||30},id:1,pe:{},pn:[],pid:200};
- (wr.data||[]).forEach(x=>{DB.pe[x.id]={f:x.floor,r:x.row_no,c:x.col_no,zone:x.zone,t:x.title,eq:x.equipment||[],room:x.is_room?1:0,name:x.is_room?`Переговорная №${x.id-150}`:undefined,cap:x.capacity||undefined,del:!x.is_active}});
+ (wr.data||[]).forEach(x=>{DB.pe[x.id]={f:x.floor,r:x.row_no,c:x.col_no,zone:x.zone,t:x.title,eq:x.equipment||[],room:x.is_room?1:0,name:x.is_room?(x.room_name||`Переговорная №${x.id-150}`):undefined,label:x.display_label||'',desc:x.description||'',cap:x.capacity||undefined,del:!x.is_active}});
  await osRefreshAvatarLinks(DB.users);
  const me=DB.users.find(x=>x.id===cloudUser.id);if(!me)throw new Error('Профиль пользователя не найден. Проверьте trigger handle_new_user и таблицу profiles.');
  S.uid=cloudUser.id;
@@ -817,6 +816,111 @@ async function cloudSaveProfile(){
 }
 async function cloudSavePassword(){const oldPassword=$('#pwo').value,newPassword=$('#pwn').value,repeat=$('#pwr').value;if(newPassword.length<6)return toast('Новый пароль — не менее 6 символов',1);if(newPassword!==repeat)return toast('Пароли не совпадают',1);const {error:verifyError}=await sb.auth.signInWithPassword({email:cloudUser.email,password:oldPassword});if(verifyError)return toast('Текущий пароль указан неверно',1);const {error}=await sb.auth.updateUser({password:newPassword});if(error)return toast(cloudError(error),1);toast('Пароль изменён')}
 
+// ===== Реальное редактирование плана: сохранение через защищённые RPC =====
+let osPlaceMutationBusy=false;
+function osWorkplaceFormPayload(id){
+ const p=P.find(x=>x.id===Number(id));
+ if(!p)throw new Error('Место не найдено или отключено. Обновите карту.');
+ const text=id=>document.getElementById(id)?.value?.trim()||'';
+ const equipment=[...document.querySelectorAll('.peq:checked')].map(x=>x.value.trim())
+  .concat(text('pe_o').split(',').map(x=>x.trim()).filter(Boolean));
+ const unique=[...new Set(equipment)];
+ const desc=text('pe_d');
+ if(desc.length>500)throw new Error('Примечание: не больше 500 символов');
+ if(unique.length>20||unique.some(x=>!x||x.length>100))throw new Error('Не более 20 элементов оборудования, до 100 символов каждый');
+ const displayName=text('pe_l');
+ if(displayName.length>100)throw new Error('Название: не больше 100 символов');
+ const type=p.room?'Переговорная':text('pe_tc')||text('pe_t');
+ if(!type||type.length>100)throw new Error('Выберите тип места (до 100 символов)');
+ const capacity=p.room?Number(document.getElementById('pe_c')?.value):null;
+ if(p.room&&(!Number.isSafeInteger(capacity)||capacity<1||capacity>100))throw new Error('Вместимость: от 1 до 100 человек');
+ return {p_workplace_id:p.id,p_title:type,p_label:p.room?null:displayName||null,
+  p_description:desc||null,p_equipment:unique,
+  p_room_name:p.room?(displayName||`Переговорная №${p.id-150}`):null,p_capacity:capacity};
+}
+async function cloudSaveWorkplace(id,button){
+ if(!cloudUser||rk()<2)return toast('Изменять план может только ИТ-специалист',1);
+ if(osPlaceMutationBusy)return;
+ let payload;
+ try{payload=osWorkplaceFormPayload(id)}catch(err){return toast(err.message,1)}
+ osPlaceMutationBusy=true;
+ if(button){button.disabled=true;button.textContent='Сохранение…'}
+ try{
+  const {error}=await sb.rpc('office_edit_workplace',payload);
+  if(error)throw error;
+  await cloudFetch();render();toast('Рабочее место сохранено в Supabase');
+ }catch(err){console.error('[OfficeSpace] workplace update',err);toast('Не удалось изменить место: '+cloudError(err),1);
+  if(button?.isConnected){button.disabled=false;button.textContent='Сохранить изменения'}}
+ finally{osPlaceMutationBusy=false}
+}
+function osOpenConfirmDialog({heading,message,confirmText,phrase,onConfirm}){
+ document.querySelector('dialog.os-admin-confirm')?.remove();
+ const d=document.createElement('dialog');d.className='os-admin-confirm';
+ const safe=osAttr;
+ d.innerHTML=`<div class="os-admin-confirm-inner"><h2>${safe(heading)}</h2><p>${safe(message)}</p>
+  ${phrase?`<label>Для подтверждения введите <b>${safe(phrase)}</b><input class="os-admin-phrase" type="text" autocomplete="off" spellcheck="false" placeholder="Введите точное значение"></label>`:''}
+  <p class="os-admin-confirm-error" role="alert" hidden></p>
+  <div class="os-admin-confirm-actions"><button type="button" class="btn sec os-admin-cancel">Отмена</button>
+  <button type="button" class="btn red os-admin-submit" ${phrase?'disabled':''}>${safe(confirmText)}</button></div></div>`;
+ document.body.appendChild(d);
+ const cancel=d.querySelector('.os-admin-cancel'),accept=d.querySelector('.os-admin-submit');
+ const phraseField=d.querySelector('.os-admin-phrase');
+ const close=()=>{if(d.open)d.close();d.remove()};
+ d.addEventListener('close',()=>d.remove(),{once:true});
+ cancel.addEventListener('click',close);
+ phraseField?.addEventListener('input',()=>{accept.disabled=phraseField.value.trim()!==phrase});
+ accept.addEventListener('click',async()=>{
+  if(accept.disabled)return;
+  accept.disabled=true;cancel.disabled=true;accept.textContent='Выполняется…';
+  d.querySelector('.os-admin-confirm-error').hidden=true;
+  try{await onConfirm();close()}
+  catch(err){console.error('[OfficeSpace] admin action',err);
+   const box=d.querySelector('.os-admin-confirm-error');box.textContent=cloudError(err);box.hidden=false;
+   cancel.disabled=false;accept.disabled=false;accept.textContent=confirmText}
+ });
+ try{d.showModal()}catch(err){d.remove();toast('Не удалось открыть окно: '+cloudError(err),1)}
+}
+function osConfirmDisableWorkplace(id){
+ if(!cloudUser||rk()<2)return toast('Отключать места может только ИТ',1);
+ const p=P.find(x=>x.id===Number(id));if(!p||p.room)return toast('Выберите действующее рабочее место',1);
+ osOpenConfirmDialog({heading:'Отключить '+nm(p)+'?',
+  message:'Место исчезнет из карты и поиска. Действующие и будущие брони будут отменены с уведомлением сотрудников. Восстановление доступно в режиме редактирования.',
+  confirmText:'Отключить место',onConfirm:async()=>{
+   const {error}=await sb.rpc('office_deactivate_workplace',{p_workplace_id:p.id});if(error)throw error;
+   S.sel=null;await cloudFetch();render();toast('Место отключено. При необходимости его можно восстановить.');
+  }});
+}
+async function cloudRestoreWorkplace(id,button){
+ if(!cloudUser||rk()<2)return toast('Восстанавливать места может только ИТ',1);
+ const p=GONE[Number(id)];if(!p)return toast('Место уже восстановлено',1);
+ if(button){button.disabled=true;button.textContent='Восстанавливаем…'}
+ try{const {error}=await sb.rpc('office_restore_workplace',{p_workplace_id:Number(id)});
+  if(error)throw error;await cloudFetch();render();toast('Рабочее место восстановлено');}
+ catch(err){toast('Не удалось восстановить: '+cloudError(err),1);if(button?.isConnected){button.disabled=false;button.textContent='Восстановить'}}
+}
+// Удаление учётной записи разрешено только ИТ через Edge Function, никогда напрямую из браузера.
+function osConfirmDeleteUser(id){
+ if(!cloudUser||rk()<2)return toast('Удалять сотрудников может только ИТ-специалист',1);
+ const u=DB.users.find(x=>x.id===String(id));
+ if(!u)return toast('Сотрудник не найден',1);
+ if(u.id===S.uid||u.role==='it')return toast('Свою учётную запись и аккаунты ИТ удалять нельзя',1);
+ const verifyPhrase=u.email||u.name;
+ if(!verifyPhrase)return toast('Не удалось определить сотрудника для подтверждения',1);
+ osOpenConfirmDialog({heading:'Удалить сотрудника?',
+  message:`${u.name} (${u.email||'без email'}). Это настоящее удаление аккаунта из Supabase Auth. Его брони, сообщения и другие связанные записи могут удалиться без восстановления. Перед действием сохраните резервную копию.`,
+  phrase:verifyPhrase,confirmText:'Удалить аккаунт навсегда',onConfirm:async()=>{
+   const {data:{session},error:sessionError}=await sb.auth.getSession();
+   if(sessionError||!session?.access_token)throw new Error('Ваша сессия истекла. Войдите заново.');
+   const response=await fetch(CLOUD_URL.replace(/\/$/,'')+'/functions/v1/delete-user',{
+    method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token,'apikey':CLOUD_KEY},
+    body:JSON.stringify({user_id:u.id})});
+   const result=await response.json().catch(()=>({error:'Некорректный ответ сервера'}));
+   if(!response.ok||result.success!==true)throw new Error(result.error||'Не удалось удалить аккаунт (HTTP '+response.status+')');
+   try{await cloudFetch();render()}catch(err){console.warn('[OfficeSpace] deleted, refresh failed',err)}
+   toast('Аккаунт удалён из Supabase Auth');
+  }});
+}
+
 async function cloudCreateUser(){
  if(!cloudUser||DB.users.find(x=>x.id===S.uid)?.role!=='it')return toast('Создавать аккаунты может только ИТ-специалист',1);
  const name=$('#un')?.value.trim(),department=$('#ud')?.value.trim()||'—',email=$('#ue')?.value.trim().toLowerCase(),phone=$('#up')?.value.trim(),password=$('#upw')?.value,role=$('#ur')?.value||'user';
@@ -1013,8 +1117,7 @@ function osBookingDialogOpen(id,kind){
  osBookingDialogClose();
  const d=document.createElement('dialog');d.id='osBookingDialog';d.className='os-block-native';
  const name=osAttr(nm(p)),date=osAttr(fmtD(b.d)),times=osAttr(osBookingTimeText(b));
- d.innerHTML=kind==='qr'?`<div class="os-native-content"><h2>Бронь №${osAttr(b.id)}</h2><p><b>${name}</b> · ${date} · ${times}</p><div style="margin:16px auto;max-width:190px;background:white;padding:10px;border-radius:12px">${qr('OS-'+p.id+'-'+b.id)}</div><p class="os-native-help">Это демонстрационный рисунок, не сканируемый QR-код. Подтверждение присутствия пока не подключено к серверу.</p><div class="os-native-actions"><button type="button" class="btn sec" id="osBookingClose">Закрыть</button></div></div>`:
- `<div class="os-native-content"><h2>Изменить время брони</h2><p><b>${name}</b> · ${date}</p><p class="os-native-help">Старая бронь будет отменена и заменена новой в одной транзакции Supabase. Если новое время недоступно, прежняя бронь сохранится.</p><div class="ctrl"><label>Начало<input id="osBookingStart" type="time" step="900" value="${tm(b.s)}"></label><label>Конец<input id="osBookingEnd" type="time" step="900" value="${tm(b.e)}"></label></div><label style="display:flex;align-items:center;gap:9px;margin-top:12px;cursor:pointer"><input id="osBookingNextDay" type="checkbox" ${b.e>=1440?'checked':''} style="width:auto;flex:none;accent-color:#8b7cf4"><span>Окончание <b>на следующий день</b> (ночная бронь)</span></label><p id="osBookingTimePreview" class="os-native-help" aria-live="polite"></p><p class="os-native-help">От ${DB.cfg.min} минут до 16 часов. Время с шагом 15 минут.</p><p id="osBookingError" class="os-native-error" role="alert" hidden></p><div class="os-native-actions"><button type="button" class="btn sec" id="osBookingClose">Назад</button><button type="button" class="btn" id="osBookingSave">Сохранить</button></div></div>`;
+ d.innerHTML=`<div class="os-native-content"><h2>Изменить время брони</h2><p><b>${name}</b> · ${date}</p><p class="os-native-help">Старая бронь будет отменена и заменена новой в одной транзакции Supabase. Если новое время недоступно, прежняя бронь сохранится.</p><div class="ctrl"><label>Начало<input id="osBookingStart" type="time" step="900" value="${tm(b.s)}"></label><label>Конец<input id="osBookingEnd" type="time" step="900" value="${tm(b.e)}"></label></div><label style="display:flex;align-items:center;gap:9px;margin-top:12px;cursor:pointer"><input id="osBookingNextDay" type="checkbox" ${b.e>=1440?'checked':''} style="width:auto;flex:none;accent-color:#8b7cf4"><span>Окончание <b>на следующий день</b> (ночная бронь)</span></label><p id="osBookingTimePreview" class="os-native-help" aria-live="polite"></p><p class="os-native-help">От ${DB.cfg.min} минут до 16 часов. Время с шагом 15 минут.</p><p id="osBookingError" class="os-native-error" role="alert" hidden></p><div class="os-native-actions"><button type="button" class="btn sec" id="osBookingClose">Назад</button><button type="button" class="btn" id="osBookingSave">Сохранить</button></div></div>`;
  document.body.appendChild(d);
  d.addEventListener('close',()=>d.remove(),{once:true});
  d.addEventListener('click',e=>{if(e.target===d)osBookingDialogClose()});
@@ -1064,7 +1167,7 @@ document.addEventListener('click',e=>{const a=e.target.closest('[data-a]'),g=e.t
  if(g&&!a){S.sel=+g.dataset.id;S.ec=null;S.dc=0;S.nt=0;return render()}
  if(!a){if(S.nt&&!e.target.closest('.nt')){S.nt=0;render()}return}
  const A=a.dataset.a,i=a.dataset.i;e.preventDefault();
- if(A==='qr'||A==='edit'){osBookingDialogOpen(i,A);return}
+ if(A==='edit'){osBookingDialogOpen(i,A);return}
  if(A==='bell'){osOpenNotifications();return}
  if(A==='savedept'){cloudSaveDepartment(i,a);return}
  if(A==='lounge'){S.m={t:'lounge'};render();return}
@@ -1087,14 +1190,16 @@ document.addEventListener('click',e=>{const a=e.target.closest('[data-a]'),g=e.t
    finally{osLogoutSigningOut=false}
   })();
   return;
- } if(A==='blk'){osOpenBlockDialog(Number(i));return} if(A=='saveprof'){cloudSaveProfile();return} if(A=='savepw'){cloudSavePassword();return} if(A==='msend'){cloudSendMessage();return} if(A==='dndon'){cloudSetDnd(false);return} if(A==='dndoff'){cloudSetDnd(true);return} if(A==='saveprivacy'){cloudSavePrivacy();return} if(A==='muteuser'){cloudSetMute();return} if(A==='unmuteuser'){cloudSetMute(true,i);return} if(A==='mopen'){cloudOpenMessage(i);return} if(A==='mreply'){const m=DB.msgs.find(x=>x.id===i);if(m){S.rp={to:m.from,subj:(m.subj.startsWith('Re: ')?'':'Re: ')+m.subj};S.mo=i;render()}return} if(A==='cfg'){cloudSaveSettings(a);return} if(['deluser','saveedit','scan','pesave','pedel','reset'].includes(A))return toast('Эта административная функция пока не подключена к облаку и отключена, чтобы не создавать локальные изменения.',1); if(A=='adduser'){cloudCreateUser();return;}
+ } if(A==='blk'){osOpenBlockDialog(Number(i));return} if(A=='saveprof'){cloudSaveProfile();return} if(A=='savepw'){cloudSavePassword();return} if(A==='msend'){cloudSendMessage();return} if(A==='dndon'){cloudSetDnd(false);return} if(A==='dndoff'){cloudSetDnd(true);return} if(A==='saveprivacy'){cloudSavePrivacy();return} if(A==='muteuser'){cloudSetMute();return} if(A==='unmuteuser'){cloudSetMute(true,i);return} if(A==='mopen'){cloudOpenMessage(i);return} if(A==='mreply'){const m=DB.msgs.find(x=>x.id===i);if(m){S.rp={to:m.from,subj:(m.subj.startsWith('Re: ')?'':'Re: ')+m.subj};S.mo=i;render()}return} if(A==='cfg'){cloudSaveSettings(a);return} if(A==='deluser'){osConfirmDeleteUser(i);return}
+ if(A==='pesave'){cloudSaveWorkplace(i,a);return}
+ if(A==='pedel'){osConfirmDisableWorkplace(i);return}
+ if(A==='perestore'){cloudRestoreWorkplace(i,a);return}
+ if(['saveedit','reset'].includes(A))return toast('Эта функция отключена в облачной версии.',1);
+ if(A=='adduser'){cloudCreateUser();return;}
  if(A=='tab'){osDidNavigate=S.v!==i;S.v=i;S.nt=0}else if(A=='fl')S.f=+i;else if(A=='book')return book(+i);else if(A=='cancel')return cancel(i);
  else if(A=='goto'){S.sel=+i;S.f=pl(+i).f;S.v='map';osDidNavigate=true}
  else if(A=='blk'){if(rk()<1)return toast('Недостаточно прав',1);const id=+i,k=DB.blocked.indexOf(id);k<0?DB.blocked.push(id):DB.blocked.splice(k,1);audit((k<0?'Заблокировано ':'Разблокировано ')+nm(pl(id)));save()}
- else if(A=='qr'||A=='edit')S.m={t:A,i:+i};else if(A=='close'){osLogoutAbort();S.m=null;}
- else if(A=='tt'){sim();const b=DB.bk.find(x=>x.id==+i);off=ts(b.d,b.s)-Date.now()}
- else if(A=='scan'){const b=DB.bk.find(x=>x.id==+i),n=now(),a0=ts(b.d,b.s);if(n<a0-9e5||n>a0+DB.cfg.ns*6e4)return toast('Подтверждение доступно за 15 мин до начала и до '+DB.cfg.ns+' мин после. Нажмите «К началу брони».',1);
-  b.st='checked';note(b.uid,'Присутствие подтверждено: '+nm(pl(b.pid)));save();S.m=null;toast('✅ '+nm(pl(b.pid))+': бронь подтверждена')}
+ else if(A=='edit')S.m={t:A,i:+i};else if(A=='close'){osLogoutAbort();S.m=null;}
  else if(A=='saveedit'){const b=DB.bk.find(x=>x.id==+i),s=pm($('#es').value),en0=pm($('#ee').value),en=en0>s?en0:en0+1440,m=validate(b.pid,b.d,s,en,b.uid,b.id);if(m)return toast(m,1);b.s=s;b.e=en;b.rem=0;audit('Изменена бронь №'+b.id);note(b.uid,'Бронь изменена: '+nm(pl(b.pid))+', '+tm(s)+'–'+tm(en));save();S.m=null;toast('Бронь изменена')}
  else if(A=='adduser'){if(rk()<2)return toast('Регистрировать пользователей может только ИТ-специалист',1);const n=$('#un').value.trim(),em=$('#ue').value.trim().toLowerCase(),phs=$('#up').value.trim(),pw=$('#upw').value,dg=phs.replace(/\D/g,'').slice(-10);
  if(!n)return toast('Введите ФИО',1);if(!emOK(em))return toast('Убедитесь в правильности ввода почты',1);if(dg.length<10)return toast('Введите телефон (не менее 10 цифр)',1);if(pw.length<6)return toast('Пароль — не менее 6 символов',1);

@@ -1281,3 +1281,23 @@ dialog.os-notifications-dialog::backdrop{background:rgba(5,8,24,.7);backdrop-fil
 .os-notification-date{font-size:11px;color:var(--mu)}
 .os-notification-dot{position:absolute;right:17px;top:23px;width:8px;height:8px;border-radius:50%;background:var(--ac)}
 .os-notifications-empty{padding:48px 20px;text-align:center;color:var(--mu)}
+
+/* Coursework finalization: authenticated IT actions */
+.os-admin-confirm{box-sizing:border-box;max-width:min(490px,calc(100vw - 28px));width:100%;
+ border:1px solid var(--bd);border-radius:20px;background:var(--card);color:var(--tx);
+ padding:0;box-shadow:0 28px 85px #0007;max-height:calc(100dvh - 30px);overflow:auto}
+.os-admin-confirm::backdrop{background:rgba(6,10,25,.78);backdrop-filter:blur(6px)}
+.os-admin-confirm-inner{padding:28px;text-align:left}
+.os-admin-confirm h2{font-size:23px;margin-bottom:14px}
+.os-admin-confirm p{color:var(--mu);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.os-admin-confirm label{display:flex;flex-direction:column;gap:9px;margin:20px 0 10px;font-size:12px}
+.os-admin-confirm label b{overflow-wrap:anywhere;color:var(--tx)}
+.os-admin-confirm input{width:100%;font-size:14px}
+.os-admin-confirm .os-admin-confirm-error{color:var(--no);padding:11px 13px;border:1px solid var(--no);border-radius:10px}
+.os-admin-confirm .os-admin-confirm-error[hidden]{display:none}
+.os-admin-confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:23px}
+.os-admin-confirm-actions button{min-height:47px}
+.os-retired-list{max-height:260px;overflow:auto}
+.os-mobile-logout{display:none}
+@media(max-width:800px){.os-mobile-logout{display:inline-grid;place-items:center;background:var(--zn);color:var(--tx);border:1px solid var(--bd);width:36px;height:36px;border-radius:10px;font-size:22px}}
+@media(max-width:480px){.os-admin-confirm-inner{padding:20px}.os-admin-confirm-actions{grid-template-columns:1fr}}
