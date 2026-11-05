@@ -1,4 +1,4 @@
-// ===== OfficeSpace — script.js (6.4.3: ночные брони) =====
+// ===== OfficeSpace — script.js (6.4.4: понятные ошибки бронирования) =====
 // Заголовки страниц и карточка пользователя в шапке раздела
 const TT={map:['Карта офиса','Выберите дату и время, затем нажмите на свободное место'],search:['Умный поиск','Подберите место по оборудованию, зоне и числу мест рядом'],mine:['Мои бронирования','Предстоящие и прошедшие брони'],all:['Все бронирования','Просмотр и управление бронями сотрудников'],stats:['Аналитика','Загрузка офиса и ключевые показатели'],staff:['Сотрудники и права','Учётные записи, роли и матрица доступа'],sys:['Система','Параметры правил, журнал аудита и состояние'],msg:['Сообщения','Внутренние сообщения без мессенджера'],acc:['Настройки аккаунта','Профиль, контакты и пароль']};
 const pageHead=()=>{const t=TT[S.v]||TT.map,u=DB.users.find(x=>x.id==S.uid);return`<div class="ph"><div><h1>${t[0]}</h1><p>${t[1]}</p></div><div class="who"><span class="av">${u.name.split(' ').map(w=>w[0]).slice(0,2).join('')}</span><div><b>${u.name}</b><small>${RN[u.role]} · ${u.dep}</small></div></div></div>`};
@@ -431,6 +431,26 @@ let sb=null, cloudUser=null, cloudChannel=null, cloudBusy=false, cloudPending=fa
 const CLOUD_URL=window.OFFICESPACE_SUPABASE_URL;
 const CLOUD_KEY=window.OFFICESPACE_SUPABASE_ANON_KEY;
 function cloudError(err){return (err&&err.message)||'Не удалось выполнить запрос к облачной базе'}
+// Человеческие сообщения для типичных ошибок бронирования.
+function osBookingFriendlyError(err){
+ const raw=String(err?.message||err||'');
+ const code=String(err?.code||'');
+ if(/bookings_active_duration_max_16h|duration.*960|длительност.*16/i.test(raw))
+  return 'Бронирование не может длиться больше 16 часов. Выберите более короткий интервал.';
+ if(code==='23P01'||/exclusion constraint|conflict.*booking|Конфликт бронирования|пересечени/i.test(raw))
+  return 'Это время уже занято другим бронированием. Выберите другое место или интервал.';
+ if(/Рабочее место недоступно|место заблокировано|рабочее место недоступно/i.test(raw))
+  return 'Рабочее место недоступно или заблокировано. Выберите другое место.';
+ if(/Минимальная длительность/i.test(raw))
+  return raw;
+ if(/Нельзя бронировать прошедшее время|Нельзя бронировать в прошлом|Дата за пределами разрешённого периода/i.test(raw))
+  return 'Выбранная дата или время недоступны для бронирования. Проверьте дату и начало.';
+ if(/Время не изменилось/i.test(raw))return 'Выберите другое время начала или окончания.';
+ if(/Бронь не найдена|принадлежит другому пользователю|Недостаточно прав/i.test(raw))
+  return 'Бронь не найдена или у вас нет прав на её изменение. Обновите страницу.';
+ if(code==='PGRST202')return 'Функция редактирования брони не найдена в Supabase. Проверьте установленный SQL.';
+ return 'Не удалось сохранить бронь: '+(raw||'неизвестная ошибка')+' (при необходимости сообщите администратору).';
+}
 // OfficeSpace 6.0 — cloud-backed IT booking settings.
 let osSettingsSaving=false;
 async function cloudSaveSettings(button){
@@ -720,7 +740,7 @@ async function cloudLogout(){
  S.v='map';S.mo=null;
  knownMessageIds=null;clearTimeout(cloudRetry);if(cloudChannel)await sb.removeChannel(cloudChannel);await sb.auth.signOut();S.m=null;osLogoutHoldTimer=null;osLogoutHeldButton=null;osLogoutHoldKey=null;cloudUser=null;S.uid=0;DB={users:[],blocked:[],bk:[],nt:[],log:[],msgs:[],cfg:{min:30,hor:14,ns:30},id:1,pe:{},pn:[]};render()}
 sweep=function(){return 0};
-book=async function(pid){const m=validate(pid,S.d,S.s,S.e,S.uid);if(m)return toast(m,1);const {error}=await sb.rpc('create_booking',{p_workplace_id:pid,p_booking_date:S.d,p_start_minute:S.s,p_end_minute:S.e});if(error)return toast(cloudError(error),1);await cloudRefresh();toast('Бронь сохранена в облаке: '+nm(pl(pid)));S.sel=null;render()};
+book=async function(pid){const m=validate(pid,S.d,S.s,S.e,S.uid);if(m)return toast(m,1);const {error}=await sb.rpc('create_booking',{p_workplace_id:pid,p_booking_date:S.d,p_start_minute:S.s,p_end_minute:S.e});if(error)return toast(osBookingFriendlyError(error),1);await cloudRefresh();toast('Бронь сохранена в облаке: '+nm(pl(pid)));S.sel=null;render()};
 cancel=async function(id){const b=DB.bk.find(x=>x.id==id);if(!b)return toast('Бронь не найдена',1);if(b.uid!==S.uid&&rk()<1)return toast('Недостаточно прав',1);const {error}=await sb.from('bookings').update({status:'cancelled'}).eq('id',id);if(error)return toast(cloudError(error),1);await cloudRefresh();toast('Бронь отменена')};
 // OfficeSpace 6.1.2 — native modal in the browser top layer.
 // Independent of render() to prevent invisible overlays and lost input.
@@ -1061,7 +1081,7 @@ function osBookingDialogOpen(id,kind){
    osBookingDialogClose();await cloudFetch();render();toast('Время брони изменено в Supabase');
   }catch(err){
    console.error('[OfficeSpace] reschedule',err);
-   fail('Не удалось изменить бронь: '+cloudError(err)+(err?.code==='PGRST202'?' (сначала выполните SQL из комплекта)':''));
+   fail(osBookingFriendlyError(err));
   }finally{if(saveBtn.isConnected){saveBtn.disabled=false;saveBtn.textContent='Сохранить'}}
  });
  try{d.showModal()}catch(err){d.remove();toast('Не удалось открыть окно: '+err.message,1)}
