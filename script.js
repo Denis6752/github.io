@@ -995,10 +995,47 @@ function osOpenNotifications(){
  show();
  try{dialog.showModal()}catch(error){dialog.remove();toast('Не удалось открыть уведомления: '+error.message,1)}
 }
+// OfficeSpace 6.3 — booking actions with native dialogs and server-side rescheduling.
+function osBookingDialogClose(){const d=document.getElementById('osBookingDialog');if(d){if(d.open)d.close();d.remove()}}
+function osBookingDialogOpen(id,kind){
+ const b=DB?.bk?.find(x=>String(x.id)===String(id));
+ if(!b||b.uid!==S.uid||b.st!=='confirmed')return toast('Эта бронь больше недоступна для действия',1);
+ const p=pl(b.pid);if(!p)return toast('Рабочее место не найдено',1);
+ osBookingDialogClose();
+ const d=document.createElement('dialog');d.id='osBookingDialog';d.className='os-block-native';
+ const name=osAttr(nm(p)),date=osAttr(fmtD(b.d)),times=osAttr(tm(b.s)+'–'+tm(b.e));
+ d.innerHTML=kind==='qr'?`<div class="os-native-content"><h2>Бронь №${osAttr(b.id)}</h2><p><b>${name}</b> · ${date} · ${times}</p><div style="margin:16px auto;max-width:190px;background:white;padding:10px;border-radius:12px">${qr('OS-'+p.id+'-'+b.id)}</div><p class="os-native-help">Это демонстрационный рисунок, не сканируемый QR-код. Подтверждение присутствия пока не подключено к серверу.</p><div class="os-native-actions"><button type="button" class="btn sec" id="osBookingClose">Закрыть</button></div></div>`:
+ `<div class="os-native-content"><h2>Изменить время брони</h2><p><b>${name}</b> · ${date}</p><p class="os-native-help">Старая бронь будет отменена и заменена новой в одной транзакции Supabase. Если новое время недоступно, прежняя бронь сохранится.</p><div class="ctrl"><label>Начало<input id="osBookingStart" type="time" step="900" value="${tm(b.s)}"></label><label>Конец<input id="osBookingEnd" type="time" step="900" value="${tm(b.e)}"></label></div><p id="osBookingError" class="os-native-error" role="alert" hidden></p><div class="os-native-actions"><button type="button" class="btn sec" id="osBookingClose">Назад</button><button type="button" class="btn" id="osBookingSave">Сохранить</button></div></div>`;
+ document.body.appendChild(d);
+ d.addEventListener('close',()=>d.remove(),{once:true});
+ d.addEventListener('click',e=>{if(e.target===d)osBookingDialogClose()});
+ d.querySelector('#osBookingClose').addEventListener('click',osBookingDialogClose);
+ const saveBtn=d.querySelector('#osBookingSave');
+ if(saveBtn)saveBtn.addEventListener('click',async()=>{
+  const start=d.querySelector('#osBookingStart').value,end=d.querySelector('#osBookingEnd').value;
+  const errorEl=d.querySelector('#osBookingError');
+  const fail=message=>{errorEl.textContent=message;errorEl.hidden=false};
+  if(!/^\d{2}:\d{2}$/.test(start)||!/^\d{2}:\d{2}$/.test(end))return fail('Укажите начало и конец');
+  const s=pm(start),e0=pm(end),en=e0>s?e0:e0+1440;
+  if(s===b.s&&en===b.e)return fail('Время не изменилось');
+  if(s<0||s>=1440||en>2880||en-s<DB.cfg.min)return fail('Проверьте время и минимальную длительность');
+  saveBtn.disabled=true;saveBtn.textContent='Сохраняем…';errorEl.hidden=true;
+  try{
+   const {error}=await sb.rpc('office_reschedule_booking',{p_booking_id:b.id,p_start_minute:s,p_end_minute:en});
+   if(error)throw error;
+   osBookingDialogClose();await cloudFetch();render();toast('Время брони изменено в Supabase');
+  }catch(err){
+   console.error('[OfficeSpace] reschedule',err);
+   fail('Не удалось изменить бронь: '+cloudError(err)+(err?.code==='PGRST202'?' (сначала выполните SQL из комплекта)':''));
+  }finally{if(saveBtn.isConnected){saveBtn.disabled=false;saveBtn.textContent='Сохранить'}}
+ });
+ try{d.showModal()}catch(err){d.remove();toast('Не удалось открыть окно: '+err.message,1)}
+}
 document.addEventListener('click',e=>{const a=e.target.closest('[data-a]'),g=e.target.closest('[data-id]');
  if(g&&!a){S.sel=+g.dataset.id;S.ec=null;S.dc=0;S.nt=0;return render()}
  if(!a){if(S.nt&&!e.target.closest('.nt')){S.nt=0;render()}return}
  const A=a.dataset.a,i=a.dataset.i;e.preventDefault();
+ if(A==='qr'||A==='edit'){osBookingDialogOpen(i,A);return}
  if(A==='bell'){osOpenNotifications();return}
  if(A==='savedept'){cloudSaveDepartment(i,a);return}
  if(A==='lounge'){S.m={t:'lounge'};render();return}
