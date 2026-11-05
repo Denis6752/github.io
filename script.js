@@ -396,7 +396,13 @@ function vMsg(){
 }
 function muteManagement(){if(rk()<1)return '';const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');const targets=DB.users.filter(u=>u.id!==S.uid&&(rk()>1?u.role!=='it':u.role==='user'));return `<div class="card os-mute-management"><h2>🔕 Ограничения сообщений</h2><p class="mu">Администрация может ограничивать сотрудников; ИТ — сотрудников и администрацию. Брони остаются доступны.</p><div class="ctrl"><label>Сотрудник<select id="muteUser">${targets.map(u=>`<option value="${esc(u.id)}">${esc(u.name)} · ${esc(RN[u.role])}</option>`).join('')}</select></label><label>Срок<select id="muteDuration"><option value="30">30 минут</option><option value="60">1 час</option><option value="1440">24 часа</option><option value="10080">7 дней</option><option value="0">Бессрочно</option></select></label><label>Причина<input id="muteReason" maxlength="250" placeholder="Причина ограничения"></label><button class="btn" data-a="muteuser" ${targets.length?'':'disabled'}>Заглушить</button></div><h3>Активные ограничения</h3>${(DB.mutes||[]).filter(m=>!m.expires_at||new Date(m.expires_at)>new Date()).filter(m=>targets.some(u=>u.id===m.user_id)).map(m=>`<div class="it"><span>${esc(uname(m.user_id))} · ${m.expires_at?new Date(m.expires_at).toLocaleString('ru-RU'):'Бессрочно'} · ${esc(m.reason||'Без причины')}</span><button class="btn sec" data-a="unmuteuser" data-i="${esc(m.user_id)}">Снять</button></div>`).join('')||'<p class="mu">Активных ограничений нет</p>'}</div>`}
 
+function osRemoveDetachedModals(){
+ // render() moves .mo outside #app. Those nodes must be explicitly removed
+ // before showing the logged-out screen (and on logout).
+ document.querySelectorAll('body > .mo.os-global-dialog').forEach(dialog=>dialog.remove());
+}
 function render(){
+ osRemoveDetachedModals();
  buildP();sweep();if(!S.uid)return loginView();fixT();
  const u=DB.users.find(x=>x.id==S.uid),R=RK[u.role],um=(DB.msgs||[]).filter(m=>m.to==S.uid&&!m.r&&!osHiddenMessages().has(String(m.id))).length;
  if(R<2){S.edit=false;S.ec=null;S.dc=0;}
@@ -594,7 +600,7 @@ document.addEventListener('focusout',()=>{if(cloudPending)setTimeout(()=>cloudRe
 window.addEventListener('online',()=>{if(cloudUser){cloudSubscribe();cloudRefresh()}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&cloudUser)cloudRefresh()});
 
-// OfficeSpace 6.6.1: confirmation is a single click, no press-and-hold.
+// OfficeSpace 6.6.2: confirmation is a single click and detached dialog is cleaned up.
 let osLogoutSigningOut=false;
 function osLogoutAbort(){} // Backward-compatible no-op for existing close/login handlers.
 
@@ -681,6 +687,8 @@ async function cloudLogin(){
  finally{if(button?.isConnected)button.disabled=false}
 }
 async function cloudLogout(){
+ osRemoveDetachedModals();
+ S.m=null;
  osAvatarLinks.clear();
  // Явный выход завершает навигационную сессию пользователя.
  // При F5 без выхода сохранённая вкладка по-прежнему восстанавливается.
