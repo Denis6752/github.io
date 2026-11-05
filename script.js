@@ -278,7 +278,7 @@ function vStaff(){
  })():'';
  return`${teamSummary}${muteManagement()}<div class="card"><h2>Сотрудники и отделы</h2><table><tr><th>ФИО</th><th>Отдел</th>${rk()>1?'<th>Email</th><th>Телефон</th>':''}<th>Роль</th><th>Telegram</th><th></th></tr>${DB.users.map(u=>`<tr><td><span class="os-staff-person"><span class="os-staff-picture">${osAvatarMarkup(u.name.split(' ').map(x=>x[0]).slice(0,2).join(''),u.id)}</span><span>${osAttr(u.name)}</span></span></td><td>${rk()>1?`<div class="os-dept-editor"><input id="dept_${u.id}" type="text" maxlength="100" value="${String(u.dep||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" aria-label="Отдел: ${String(u.name||'Сотрудник').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" /><button class="btn sec" data-a="savedept" data-i="${u.id}" type="button">Сохранить</button></div>`:u.dep}</td>${rk()>1?`<td>${u.email||'—'}</td><td>${u.phone||'—'}</td>`:''}<td>${rk()>1?`<select id="rl_${u.id}" ${u.id==S.uid||u.role=='it'?'disabled title="Роль защищена"':''}>${Object.keys(RN).map(k=>`<option value="${k}" ${k==u.role?'selected':''}>${RN[k]}</option>`).join('')}</select>`:RN[u.role]}</td><td>${osTelegramHref(u.tg)?`<a class="os-telegram-link" href="${osTelegramHref(u.tg)}" target="_blank" rel="noopener noreferrer">@${osTelegramClean(u.tg)}</a>`:'<span class="mu">Не указан</span>'}</td><td>${rk()>1&&u.id!=S.uid&&u.role!='it'?`<button class="btn red" data-a="deluser" data-i="${u.id}">Удалить</button>`:''}</td></tr>`).join('')}</table></div>${rk()>1?`<div class="card"><h2>Регистрация нового пользователя (только ИТ-специалист)</h2><div class="ctrl"><label>ФИО<input id="un"></label><label>Отдел<input id="ud"></label><label>Email<input id="ue" class="em" autocomplete="off" placeholder="name@mail.ru"><small class="eh">Убедитесь в правильности ввода почты</small></label><label>Телефон<input id="up" class="ph" placeholder="+7 747 584 12 30"></label><label>Пароль<input id="upw" placeholder="не менее 6 символов"></label><label>Роль<select id="ur"><option value="user">Сотрудник</option><option value="admin">Администрация</option><option value="it">ИТ-специалист</option></select></label><button class="btn" data-a="adduser">Создать аккаунт</button></div></div>`:'<div class="card mu">🔒 Регистрация новых пользователей доступна только ИТ-специалисту.</div>'}<div class="card"><h2>Матрица прав доступа (RBAC)</h2><table><tr><th>Функция</th><th>Сотрудник</th><th>Администрация</th><th>ИТ</th></tr>${[['Карта, поиск, бронирование, изменение и отмена своих броней, QR',1,1,1],['Просмотр всех броней, отмена чужих броней, блокировка мест',0,1,1],['Аналитика загрузки, добавление сотрудников',0,1,1],['Назначение ролей, удаление пользователей',0,0,1],['Настройка правил, журнал аудита, состояние системы, сброс данных',0,0,1]].map(r=>`<tr><td>${r[0]}</td>${r.slice(1).map(v=>`<td>${v?'✅':'—'}</td>`).join('')}</tr>`).join('')}</table></div>`}
 function modal(){const m=S.m;if(!m)return'';
- if(m.t==='logout')return`<div class="mo os-logout-overlay" role="presentation"><div class="md os-logout-dialog" role="dialog" aria-modal="true" aria-labelledby="os-logout-title" aria-describedby="os-logout-desc"><span class="os-logout-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M12 3h6a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-6"/></svg></span><span class="os-logout-kicker">ЗАВЕРШЕНИЕ СЕАНСА</span><h2 id="os-logout-title">Уже уходите?</h2><p id="os-logout-desc">Вы действительно хотите выйти из OfficeSpace?</p><div class="os-logout-actions"><button type="button" class="os-logout-stay" data-a="close">Нет, остаться</button><button type="button" class="os-logout-leave" data-a="logout-confirm" aria-label="Удерживайте 1,8 секунды, чтобы выйти"><span class="os-logout-progress" aria-hidden="true"></span><span class="os-logout-leave-label">Да, хочу выйти</span></button></div></div></div>`;
+ if(m.t==='logout')return`<div class="mo os-logout-overlay" role="presentation"><div class="md os-logout-dialog" role="dialog" aria-modal="true" aria-labelledby="os-logout-title" aria-describedby="os-logout-desc"><span class="os-logout-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M12 3h6a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-6"/></svg></span><span class="os-logout-kicker">ЗАВЕРШЕНИЕ СЕАНСА</span><h2 id="os-logout-title">Уже уходите?</h2><p id="os-logout-desc">Вы действительно хотите выйти из OfficeSpace?</p><div class="os-logout-actions"><button type="button" class="os-logout-stay" data-a="close">Нет, остаться</button><button type="button" class="os-logout-leave" data-a="logout-confirm" aria-label="Подтвердить выход из аккаунта"><span class="os-logout-progress" aria-hidden="true"></span><span class="os-logout-leave-label">Да, хочу выйти</span></button></div></div></div>`;
 
  if(m.t==='lounge')return`<div class="mo os-lounge-backdrop" role="presentation"><div class="md os-lounge-dialog" role="dialog" aria-modal="true" aria-labelledby="os-lounge-title"><div class="os-lounge-dialog-icon" aria-hidden="true">☕</div><h2 id="os-lounge-title">Зона отдыха</h2><p class="os-lounge-lead">Пространство для перерывов на каждом этаже. <b>Бронирование не требуется.</b></p><div class="os-lounge-features"><div><span>☕</span><span>Кофе-автомат и чайная станция</span></div><div><span>🛋</span><span>Диваны и удобные кресла</span></div><div><span>🚰</span><span>Кулер с питьевой водой</span></div><div><span>🍽</span><span>Микроволновая печь и холодильник</span></div><div><span>📚</span><span>Книги и журналы</span></div></div><button class="btn os-lounge-close" data-a="close" type="button">Понятно, закрыть</button></div></div>`;
  if(m.t=='help')return`<div class="mo"><div class="md" style="max-width:540px;text-align:left"><h2>🕐 Зачем нужна «машина времени»?</h2><p>Это <b>демо-инструмент</b>. Часть функций зависит от времени, и без неё их пришлось бы ждать по-настоящему:</p><ul class="rl"><li><b>Автоосвобождение</b>: если через 30 минут после начала брони нет подтверждения, бронь становится «Не использовано», а место освобождается.</li><li><b>Напоминание</b> за 30 минут до начала.</li><li><b>QR-подтверждение</b>: доступно с −15 до +30 минут от начала брони.</li><li>Завершение броней и ночные брони.</li></ul><p><b>+1 ч / +1 д</b> сдвигают часы сайта вперёд. <b>Сброс</b> возвращает реальное время и откатывает данные к состоянию до симуляции: в демо-режиме изменения не сохраняются, а после перезагрузки страницы всё возвращается как было.</p><div style="text-align:right"><button class="btn" data-a="close">Понятно</button></div></div></div>`;const b=DB.bk.find(x=>x.id==m.i),p=pl(b.pid);
@@ -392,7 +392,7 @@ function vMsg(){
  const all=[...I,...O].filter(m=>!hidden.has(String(m.id))).sort((a,b)=>b.at-a.at),selected=all.find(m=>String(m.id)===String(S.mo))||null;
  const listItem=m=>{const incoming=m.to===me,person=uname(incoming?m.from:m.to),initials=person.split(' ').map(x=>x[0]).slice(0,2).join('');return `<button class="thread ${S.mo===m.id?'selected':''} ${incoming&&!m.r?'unread':''}" data-a="mopen" data-i="${m.id}"><span class="thread-avatar">${osAvatarMarkup(initials,incoming?m.from:m.to)}</span><span class="thread-body"><span class="thread-line"><b>${esc(person)}</b><small>${new Date(m.at).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'})}</small></span><span class="thread-subject">${esc(m.subj||m.type)}</span><span class="thread-excerpt">${esc((m.text||'').slice(0,78))}</span></span></button>`};
  const privacy=rk()>=1?`<div class="mess-settings"><h3>Приватность</h3><label>Кто может писать мне<select id="privacyMode"><option value="all" ${DB.myPrivacy==='all'?'selected':''}>Все сотрудники</option><option value="admins" ${DB.myPrivacy==='admins'?'selected':''}>Только администрация и ИТ</option><option value="none" ${DB.myPrivacy==='none'?'selected':''}>Никто</option></select></label><button class="btn sec" data-a="saveprivacy">Сохранить</button></div>`:'';
- return `<div class="os-msg-dnd-shell"><details class="os-msg-dnd"><summary><span>🌙 Режим «Не беспокоить»</span><span class="os-msg-dnd-state">${dndActive()?'Включён':'Выключен'} · Настроить</span></summary>${dndSettings()}</details></div><section class="messenger"><aside class="mess-list"><div class="mess-panel-title"><span>Диалоги</span><span class="mess-count">${all.length}</span></div><div class="mess-filter">Все сообщения <span>· ${I.filter(m=>!m.r&&!hidden.has(String(m.id))).length} непрочитанных</span></div><div class="mess-threads">${all.map(listItem).join('')||'<div class="mess-empty">Сообщений пока нет</div>'}</div></aside><div class="mess-center"><div class="mess-panel-title">${selected?esc(uname(selected.to===me?selected.from:selected.to)):'Переписка'}<span class="mess-online">${selected&&osTelegramHref(DB.users.find(u=>u.id===(selected.to===me?selected.from:selected.to))?.tg)?`<a class="os-telegram-link" target="_blank" rel="noopener noreferrer" href="${osTelegramHref(DB.users.find(u=>u.id===(selected.to===me?selected.from:selected.to))?.tg)}">Написать в Telegram ↗</a>`:'● OfficeSpace'}</span></div>${selected?`<div class="mess-conversation"><div class="mess-date">${new Date(selected.at).toLocaleString('ru-RU')}</div><div class="mess-bubble ${selected.from===me?'outgoing':''}"><span class="mess-bubble-kind">${esc(selected.type||'Сообщение')}</span><h3>${esc(selected.subj)}</h3><p>${esc(selected.text)}</p></div></div><div class="mess-bottom">${selected.to===me&&!myMute?`<button class="btn" data-a="mreply" data-i="${selected.id}">↩ Ответить</button>`:''}<button class="btn sec" data-a="mhide" data-i="${selected.id}" title="Скрыть это сообщение у себя на всех устройствах">Удалить у себя</button><span>История сообщений синхронизируется через Supabase</span></div>`:'<div class="mess-placeholder"><span class="mess-placeholder-icon">✉</span><h2>Выберите сообщение</h2><p>Здесь появится переписка с сотрудниками</p></div>'}</div><aside class="mess-compose"><div class="mess-panel-title">Новое сообщение</div><div class="mess-compose-content">${myMute?`<p class="mu">🔕 Отправка сообщений ограничена${myMute.expires_at?' до '+new Date(myMute.expires_at).toLocaleString('ru-RU'):''}.</p>`:''}<div class="mess-fields"><label>Получатель<select id="mto" ${myMute?'disabled':''}><option value="">Выберите сотрудника</option>${peers.map(x=>`<option value="${esc(x.id)}" ${rp.to===x.id?'selected':''} ${blocked(x)?'disabled':''}>${esc(x.name)}${blocked(x)?' · входящие закрыты':''}</option>`).join('')}</select></label><label>Тема<input id="msj" maxlength="200" value="${esc(rp.subj||'')}" placeholder="Тема сообщения" ${myMute?'disabled':''}></label><label>Сообщение<textarea id="mtx" rows="7" maxlength="10000" placeholder="Напишите сообщение..." ${myMute?'disabled':''}></textarea></label><button class="btn" data-a="msend" ${myMute?'disabled':''}>Отправить сообщение ↗</button></div>${privacy}</div></aside></section>`;
+ return `<div class="os-msg-dnd-shell"><details class="os-msg-dnd"><summary><span>🌙 Режим «Не беспокоить»</span><span class="os-msg-dnd-state">${dndActive()?'Включён':'Выключен'} · Настроить</span></summary>${dndSettings()}</details></div><section class="messenger"><aside class="mess-list"><div class="mess-panel-title"><span>Диалоги</span><span class="mess-count">${all.length}</span></div><div class="mess-filter" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><span>Все сообщения · ${I.filter(m=>!m.r&&!hidden.has(String(m.id))).length} непрочитанных</span>${all.length?`<button type="button" class="btn sec" data-a="mhideall" style="font-size:12px;padding:6px 10px" title="Скрыть всю историю только для вашего аккаунта">Очистить у себя</button>`:''}</div><div class="mess-threads" style="overflow-y:auto;min-height:0;max-height:calc(100vh - 275px)">${all.map(listItem).join('')||'<div class="mess-empty">Сообщений пока нет</div>'}</div></aside><div class="mess-center"><div class="mess-panel-title">${selected?esc(uname(selected.to===me?selected.from:selected.to)):'Переписка'}<span class="mess-online">${selected&&osTelegramHref(DB.users.find(u=>u.id===(selected.to===me?selected.from:selected.to))?.tg)?`<a class="os-telegram-link" target="_blank" rel="noopener noreferrer" href="${osTelegramHref(DB.users.find(u=>u.id===(selected.to===me?selected.from:selected.to))?.tg)}">Написать в Telegram ↗</a>`:'● OfficeSpace'}</span></div>${selected?`<div class="mess-conversation"><div class="mess-date">${new Date(selected.at).toLocaleString('ru-RU')}</div><div class="mess-bubble ${selected.from===me?'outgoing':''}"><span class="mess-bubble-kind">${esc(selected.type||'Сообщение')}</span><h3>${esc(selected.subj)}</h3><p>${esc(selected.text)}</p></div></div><div class="mess-bottom">${selected.to===me&&!myMute?`<button class="btn" data-a="mreply" data-i="${selected.id}">↩ Ответить</button>`:''}<button class="btn sec" data-a="mhide" data-i="${selected.id}" title="Скрыть это сообщение у себя на всех устройствах">Удалить у себя</button><span>История сообщений синхронизируется через Supabase</span></div>`:'<div class="mess-placeholder"><span class="mess-placeholder-icon">✉</span><h2>Выберите сообщение</h2><p>Здесь появится переписка с сотрудниками</p></div>'}</div><aside class="mess-compose"><div class="mess-panel-title">Новое сообщение</div><div class="mess-compose-content">${myMute?`<p class="mu">🔕 Отправка сообщений ограничена${myMute.expires_at?' до '+new Date(myMute.expires_at).toLocaleString('ru-RU'):''}.</p>`:''}<div class="mess-fields"><label>Получатель<select id="mto" ${myMute?'disabled':''}><option value="">Выберите сотрудника</option>${peers.map(x=>`<option value="${esc(x.id)}" ${rp.to===x.id?'selected':''} ${blocked(x)?'disabled':''}>${esc(x.name)}${blocked(x)?' · входящие закрыты':''}</option>`).join('')}</select></label><label>Тема<input id="msj" maxlength="200" value="${esc(rp.subj||'')}" placeholder="Тема сообщения" ${myMute?'disabled':''}></label><label>Сообщение<textarea id="mtx" rows="7" maxlength="10000" placeholder="Напишите сообщение..." ${myMute?'disabled':''}></textarea></label><button class="btn" data-a="msend" ${myMute?'disabled':''}>Отправить сообщение ↗</button></div>${privacy}</div></aside></section>`;
 }
 function muteManagement(){if(rk()<1)return '';const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');const targets=DB.users.filter(u=>u.id!==S.uid&&(rk()>1?u.role!=='it':u.role==='user'));return `<div class="card os-mute-management"><h2>🔕 Ограничения сообщений</h2><p class="mu">Администрация может ограничивать сотрудников; ИТ — сотрудников и администрацию. Брони остаются доступны.</p><div class="ctrl"><label>Сотрудник<select id="muteUser">${targets.map(u=>`<option value="${esc(u.id)}">${esc(u.name)} · ${esc(RN[u.role])}</option>`).join('')}</select></label><label>Срок<select id="muteDuration"><option value="30">30 минут</option><option value="60">1 час</option><option value="1440">24 часа</option><option value="10080">7 дней</option><option value="0">Бессрочно</option></select></label><label>Причина<input id="muteReason" maxlength="250" placeholder="Причина ограничения"></label><button class="btn" data-a="muteuser" ${targets.length?'':'disabled'}>Заглушить</button></div><h3>Активные ограничения</h3>${(DB.mutes||[]).filter(m=>!m.expires_at||new Date(m.expires_at)>new Date()).filter(m=>targets.some(u=>u.id===m.user_id)).map(m=>`<div class="it"><span>${esc(uname(m.user_id))} · ${m.expires_at?new Date(m.expires_at).toLocaleString('ru-RU'):'Бессрочно'} · ${esc(m.reason||'Без причины')}</span><button class="btn sec" data-a="unmuteuser" data-i="${esc(m.user_id)}">Снять</button></div>`).join('')||'<p class="mu">Активных ограничений нет</p>'}</div>`}
 
@@ -594,60 +594,9 @@ document.addEventListener('focusout',()=>{if(cloudPending)setTimeout(()=>cloudRe
 window.addEventListener('online',()=>{if(cloudUser){cloudSubscribe();cloudRefresh()}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&cloudUser)cloudRefresh()});
 
-// OfficeSpace 5.1: hold-to-confirm logout. Pointer and keyboard both supported.
-const osLogoutHoldMs=1800;
-let osLogoutHoldTimer=null,osLogoutHeldButton=null,osLogoutHoldKey=null,osLogoutSigningOut=false;
-function osLogoutAbort(){
- if(osLogoutHoldTimer!==null){clearTimeout(osLogoutHoldTimer);osLogoutHoldTimer=null}
- if(osLogoutHeldButton){
-  osLogoutHeldButton.classList.remove('os-is-holding');
-  const hint=osLogoutHeldButton.closest('.os-logout-dialog')?.querySelector('.os-logout-hint');
-  if(hint)hint.textContent='Удерживайте красную кнопку до завершения полосы';
- }
- osLogoutHeldButton=null;osLogoutHoldKey=null;
-}
-function osLogoutHoldStart(button,key){
- if(osLogoutSigningOut||osLogoutHoldTimer!==null||S.m?.t!=='logout'||!button?.isConnected)return;
- osLogoutHeldButton=button;osLogoutHoldKey=key;
- button.classList.remove('os-is-holding');
- void button.offsetWidth; // Restart visual progress on each attempt.
- button.classList.add('os-is-holding');
- const hint=button.closest('.os-logout-dialog')?.querySelector('.os-logout-hint');
- if(hint)hint.textContent='Удерживайте…';
- osLogoutHoldTimer=setTimeout(async()=>{
-  osLogoutHoldTimer=null;
-  if(S.m?.t!=='logout'||!button.isConnected||osLogoutSigningOut)return;
-  osLogoutSigningOut=true;
-  button.classList.add('os-is-logging-out');
-  button.disabled=true;
-  if(hint)hint.textContent='Завершаем сеанс…';
-  osLogoutHeldButton=null;osLogoutHoldKey=null;
-  try{await cloudLogout()}
-  catch(error){osLogoutSigningOut=false;S.m=null;render();toast('Не удалось выйти: '+(error?.message||'ошибка сети'),1)}
-  finally{osLogoutSigningOut=false}
- },osLogoutHoldMs);
-}
-document.addEventListener('pointerdown',e=>{
- const button=e.target.closest('[data-a="logout-confirm"]');
- if(!button||e.button!==0||!e.isPrimary)return;
- e.preventDefault();
- try{button.setPointerCapture(e.pointerId)}catch(_e){}
- osLogoutHoldStart(button,'pointer:'+e.pointerId);
-});
-function osLogoutPointerFinish(e){
- if(osLogoutHoldKey==='pointer:'+e.pointerId)osLogoutAbort();
-}
-document.addEventListener('pointerup',osLogoutPointerFinish);
-document.addEventListener('pointercancel',osLogoutPointerFinish);
-window.addEventListener('blur',osLogoutAbort);
-document.addEventListener('keydown',e=>{
- const button=e.target.closest?.('[data-a="logout-confirm"]');
- if(!button||e.repeat||!(e.key===' '||e.key==='Enter'))return;
- e.preventDefault();osLogoutHoldStart(button,'key:'+e.key);
-});
-document.addEventListener('keyup',e=>{
- if(osLogoutHoldKey==='key:'+e.key){e.preventDefault();osLogoutAbort()}
-});
+// OfficeSpace 6.6.1: confirmation is a single click, no press-and-hold.
+let osLogoutSigningOut=false;
+function osLogoutAbort(){} // Backward-compatible no-op for existing close/login handlers.
 
 async function cloudBoot(){
  if(!CLOUD_URL||!CLOUD_KEY||!window.supabase?.createClient){$('#app').innerHTML='<main class="card"><h2>Не настроено подключение Supabase</h2><p>Проверьте файл supabase-config.js.</p></main>';return}
@@ -737,7 +686,7 @@ async function cloudLogout(){
  // При F5 без выхода сохранённая вкладка по-прежнему восстанавливается.
  try{if(S.uid)sessionStorage.removeItem(osViewKey(S.uid))}catch(e){}
  S.v='map';S.mo=null;
- knownMessageIds=null;clearTimeout(cloudRetry);if(cloudChannel)await sb.removeChannel(cloudChannel);await sb.auth.signOut();S.m=null;osLogoutHoldTimer=null;osLogoutHeldButton=null;osLogoutHoldKey=null;cloudUser=null;S.uid=0;DB={users:[],blocked:[],bk:[],nt:[],log:[],msgs:[],cfg:{min:30,hor:14,ns:30},id:1,pe:{},pn:[]};render()}
+ knownMessageIds=null;clearTimeout(cloudRetry);if(cloudChannel)await sb.removeChannel(cloudChannel);const {error:signOutError}=await sb.auth.signOut();if(signOutError)throw signOutError;S.m=null;cloudUser=null;S.uid=0;DB={users:[],blocked:[],bk:[],nt:[],log:[],msgs:[],cfg:{min:30,hor:14,ns:30},id:1,pe:{},pn:[]};render()}
 sweep=function(){return 0};
 book=async function(pid){const m=validate(pid,S.d,S.s,S.e,S.uid);if(m)return toast(m,1);const {error}=await sb.rpc('create_booking',{p_workplace_id:pid,p_booking_date:S.d,p_start_minute:S.s,p_end_minute:S.e});if(error)return toast(osBookingFriendlyError(error),1);await cloudRefresh();toast('Бронь сохранена в облаке: '+nm(pl(pid)));S.sel=null;render()};
 cancel=async function(id){const b=DB.bk.find(x=>x.id==id);if(!b)return toast('Бронь не найдена',1);if(b.uid!==S.uid&&rk()<1)return toast('Недостаточно прав',1);const {error}=await sb.from('bookings').update({status:'cancelled'}).eq('id',id);if(error)return toast(cloudError(error),1);await cloudRefresh();toast('Бронь отменена')};
@@ -976,6 +925,24 @@ async function cloudHideMessage(id,button){
   toast('Сообщение удалено у вас на всех устройствах');
  }catch(error){toast('Не удалось удалить сообщение: '+cloudError(error),1);if(button?.isConnected)button.disabled=false}
 }
+// Hide the current user's whole message history without affecting recipients.
+let osBulkHideBusy=false;
+async function cloudHideAllMessages(button){
+ if(!sb||!cloudUser||osBulkHideBusy)return;
+ const visible=(DB.msgs||[]).filter(m=>(m.from===cloudUser.id||m.to===cloudUser.id)&&!osHiddenMessages().has(String(m.id))).length;
+ if(!visible)return toast('Нет сообщений для очистки');
+ if(!window.confirm('Скрыть все сообщения у себя? У собеседников переписка сохранится. Отмена этого действия не предусмотрена.'))return;
+ osBulkHideBusy=true;
+ if(button){button.disabled=true;button.textContent='Очищаем…'}
+ try{
+  const {data,error}=await sb.rpc('office_hide_all_my_messages');
+  if(error)throw error;
+  S.mo=null;
+  await cloudFetch();render();
+  toast('История очищена у вас. Скрыто сообщений: '+Number(data||0));
+ }catch(error){toast('Не удалось очистить историю: '+cloudError(error),1);if(button?.isConnected){button.disabled=false;button.textContent='Очистить у себя'}}
+ finally{osBulkHideBusy=false}
+}
 async function cloudOpenMessage(id){
  const m=DB.msgs.find(x=>x.id===id);if(!m)return;
  S.mo=S.mo===id?null:id;
@@ -1098,10 +1065,21 @@ document.addEventListener('click',e=>{const a=e.target.closest('[data-a]'),g=e.t
  if(A==='all-next'){S.allPage=(S.allPage||0)+1;render();return}
  if(A==='zone'){S.zone=i;S.sel=null;render();return}
  if(A==='mhide'){cloudHideMessage(i,a);return}
+ if(A==='mhideall'){cloudHideAllMessages(a);return}
  if(A==='avatarpick'){const index=Number(i);if(!Number.isInteger(index)||index<0||index>=osDevAvatarThemes.length)return;osSaveAvatarPreset(index);return}
  if(A==='avatarclear'){osClearAvatar();return}
  if(A==='auth-visibility'){const pw=$('#pw');if(pw){pw.type=pw.type==='password'?'text':'password';a.setAttribute('aria-pressed',String(pw.type==='text'));a.setAttribute('aria-label',pw.type==='text'?'Скрыть пароль':'Показать пароль')}return}
- if(A=='login'){cloudLogin();return} if(A=='logout'){S.m={t:'logout'};render();return} if(A==='logout-confirm'){return} if(A==='blk'){osOpenBlockDialog(Number(i));return} if(A=='saveprof'){cloudSaveProfile();return} if(A=='savepw'){cloudSavePassword();return} if(A==='msend'){cloudSendMessage();return} if(A==='dndon'){cloudSetDnd(false);return} if(A==='dndoff'){cloudSetDnd(true);return} if(A==='saveprivacy'){cloudSavePrivacy();return} if(A==='muteuser'){cloudSetMute();return} if(A==='unmuteuser'){cloudSetMute(true,i);return} if(A==='mopen'){cloudOpenMessage(i);return} if(A==='mreply'){const m=DB.msgs.find(x=>x.id===i);if(m){S.rp={to:m.from,subj:(m.subj.startsWith('Re: ')?'':'Re: ')+m.subj};S.mo=i;render()}return} if(A==='cfg'){cloudSaveSettings(a);return} if(['deluser','saveedit','scan','pesave','pedel','reset'].includes(A))return toast('Эта административная функция пока не подключена к облаку и отключена, чтобы не создавать локальные изменения.',1); if(A=='adduser'){cloudCreateUser();return;}
+ if(A=='login'){cloudLogin();return} if(A=='logout'){S.m={t:'logout'};render();return} if(A==='logout-confirm'){
+  if(osLogoutSigningOut)return;
+  osLogoutSigningOut=true;
+  a.disabled=true;a.textContent='Выходим…';
+  (async()=>{
+   try{await cloudLogout()}
+   catch(error){toast('Не удалось выйти: '+cloudError(error),1);if(cloudUser){S.m=null;render()}}
+   finally{osLogoutSigningOut=false}
+  })();
+  return;
+ } if(A==='blk'){osOpenBlockDialog(Number(i));return} if(A=='saveprof'){cloudSaveProfile();return} if(A=='savepw'){cloudSavePassword();return} if(A==='msend'){cloudSendMessage();return} if(A==='dndon'){cloudSetDnd(false);return} if(A==='dndoff'){cloudSetDnd(true);return} if(A==='saveprivacy'){cloudSavePrivacy();return} if(A==='muteuser'){cloudSetMute();return} if(A==='unmuteuser'){cloudSetMute(true,i);return} if(A==='mopen'){cloudOpenMessage(i);return} if(A==='mreply'){const m=DB.msgs.find(x=>x.id===i);if(m){S.rp={to:m.from,subj:(m.subj.startsWith('Re: ')?'':'Re: ')+m.subj};S.mo=i;render()}return} if(A==='cfg'){cloudSaveSettings(a);return} if(['deluser','saveedit','scan','pesave','pedel','reset'].includes(A))return toast('Эта административная функция пока не подключена к облаку и отключена, чтобы не создавать локальные изменения.',1); if(A=='adduser'){cloudCreateUser();return;}
  if(A=='tab'){osDidNavigate=S.v!==i;S.v=i;S.nt=0}else if(A=='fl')S.f=+i;else if(A=='book')return book(+i);else if(A=='cancel')return cancel(i);
  else if(A=='goto'){S.sel=+i;S.f=pl(+i).f;S.v='map';osDidNavigate=true}
  else if(A=='blk'){if(rk()<1)return toast('Недостаточно прав',1);const id=+i,k=DB.blocked.indexOf(id);k<0?DB.blocked.push(id):DB.blocked.splice(k,1);audit((k<0?'Заблокировано ':'Разблокировано ')+nm(pl(id)));save()}
