@@ -1,4 +1,4 @@
-// ===== OfficeSpace — script.js =====
+// ===== OfficeSpace — script.js (6.4.3: ночные брони) =====
 // Заголовки страниц и карточка пользователя в шапке раздела
 const TT={map:['Карта офиса','Выберите дату и время, затем нажмите на свободное место'],search:['Умный поиск','Подберите место по оборудованию, зоне и числу мест рядом'],mine:['Мои бронирования','Предстоящие и прошедшие брони'],all:['Все бронирования','Просмотр и управление бронями сотрудников'],stats:['Аналитика','Загрузка офиса и ключевые показатели'],staff:['Сотрудники и права','Учётные записи, роли и матрица доступа'],sys:['Система','Параметры правил, журнал аудита и состояние'],msg:['Сообщения','Внутренние сообщения без мессенджера'],acc:['Настройки аккаунта','Профиль, контакты и пароль']};
 const pageHead=()=>{const t=TT[S.v]||TT.map,u=DB.users.find(x=>x.id==S.uid);return`<div class="ph"><div><h1>${t[0]}</h1><p>${t[1]}</p></div><div class="who"><span class="av">${u.name.split(' ').map(w=>w[0]).slice(0,2).join('')}</span><div><b>${u.name}</b><small>${RN[u.role]} · ${u.dep}</small></div></div></div>`};
@@ -15,6 +15,21 @@ const femail=v=>{v=v.toLowerCase().replace(/[^a-z0-9@._%+-]/g,'');const at=v.ind
 const emOK=v=>{const m=v.match(/^([a-z0-9._%+-]+)@((?:[a-z0-9-]+\.)+)([a-z]{2,})$/i);return !!m&&!/^\.|\.$|\.\./.test(m[1])&&TLD.includes(m[3].toLowerCase())&&!/(^|\.)-|-(\.|$)/.test(m[2])};
 const nv=n=>/сообщени/i.test(n.t)?'msg':/Добро пожаловать/.test(n.t)?'map':/брон|присутств/i.test(n.t)?'mine':'map';
 const fmtD=d=>new Date(d+'T00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long',weekday:'short'});
+// Ночные брони хранят время окончания в минутах от начала даты бронирования.
+// Например, 1500 = 01:00 следующего дня. Сдвигаем ISO-дату через UTC,
+// чтобы прибавление суток не зависело от часового пояса браузера.
+const osDatePlusDays=(d,days=1)=>{
+ const [y,m,day]=d.split('-').map(Number);
+ return new Date(Date.UTC(y,m-1,day+days)).toISOString().slice(0,10);
+};
+const OS_BOOKING_MAX_MINUTES=960; // 16 часов: действующий предел в выборе на карте.
+const osBookingTimeText=b=>tm(b.s)+'–'+tm(b.e)+(b.e>=1440?' (+1 день, '+fmtD(osDatePlusDays(b.d))+')':'');
+const osBookingDateTimeText=b=>fmtD(b.d)+', '+osBookingTimeText(b);
+const osBookingDurationText=minutes=>{
+ if(minutes<=0)return 'некорректный интервал';
+ const h=Math.floor(minutes/60),min=minutes%60;
+ return (h?h+' ч':'')+(h&&min?' ':'')+(min?min+' мин':'');
+};
 const ACT=['confirmed','checked'],OK=[...ACT,'done'];
 const SN={confirmed:'Подтверждена',checked:'Присутствие подтверждено',cancelled:'Отменена',noshow:'Не использовано',done:'Завершена'};
 const ZN=['Общая зона','Тихая зона','Командная зона'];
@@ -64,11 +79,11 @@ const audit=t=>{DB.log=DB.log||[];DB.log.unshift({u:S.uid||0,t,at:now()});DB.log
 function toast(t,er){const e=document.createElement('div');e.className='toast'+(er?' er':'');e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),3300)}
 function st(pid,d=S.d,s=S.s,e=S.e){if(DB.blocked.includes(pid))return{k:'blk'};const A0=dn(d)*1440+s,A1=dn(d)*1440+e,b=DB.bk.find(b=>b.pid==pid&&ACT.includes(b.st)&&Math.abs(dn(b.d)-dn(d))<2&&dn(b.d)*1440+b.s<A1&&A0<dn(b.d)*1440+b.e);return b?{k:b.uid==S.uid?'me':'busy',b}:{k:'free'}}
 function validate(pid,d,s,e,uid,ex){if(!P.some(x=>x.id==pid))return'Место не найдено';if(DB.blocked.includes(pid))return'Место заблокировано администратором';
- if(e<=s||e-s<DB.cfg.min)return'Минимальная длительность брони — '+DB.cfg.min+' минут';if(ts(d,0)>now()+DB.cfg.hor*864e5)return'Бронировать можно не более чем на '+DB.cfg.hor+' дней вперёд';if(ts(d,e)<=now()||(!ex&&ts(d,s)<now()-9e5))return'Нельзя бронировать в прошлом: выберите время от текущего момента';
+ if(e<=s||e-s<DB.cfg.min)return'Минимальная длительность брони — '+DB.cfg.min+' минут';if(e-s>OS_BOOKING_MAX_MINUTES)return'Максимальная длительность брони — 16 часов';if(ts(d,0)>now()+DB.cfg.hor*864e5)return'Бронировать можно не более чем на '+DB.cfg.hor+' дней вперёд';if(ts(d,e)<=now()||(!ex&&ts(d,s)<now()-9e5))return'Нельзя бронировать в прошлом: выберите время от текущего момента';
  const A0=dn(d)*1440+s,A1=dn(d)*1440+e,A=DB.bk.filter(b=>b.id!=ex&&ACT.includes(b.st)&&Math.abs(dn(b.d)-dn(d))<2&&dn(b.d)*1440+b.s<A1&&A0<dn(b.d)*1440+b.e);
  const c=A.find(b=>b.pid==pid);if(c)return'409 Конфликт: место занято ('+tm(c.s)+'–'+tm(c.e)+')';if(A.find(b=>b.uid==uid))return'У вас уже есть бронь на это время';return''}
 function book(pid){const m=validate(pid,S.d,S.s,S.e,S.uid);if(m)return toast(m,1);DB.bk.push({id:DB.id++,uid:S.uid,pid,d:S.d,s:S.s,e:S.e,st:'confirmed'});
- note(S.uid,'Бронь создана: '+nm(pl(pid))+', '+fmtD(S.d)+', '+tm(S.s)+'–'+tm(S.e));audit('Создана бронь: '+nm(pl(pid))+', '+S.d+' '+tm(S.s)+'–'+tm(S.e));save();toast('Забронировано: '+nm(pl(pid)));render()}
+ note(S.uid,'Бронь создана: '+nm(pl(pid))+', '+fmtD(S.d)+', '+osBookingTimeText({d:S.d,s:S.s,e:S.e}));audit('Создана бронь: '+nm(pl(pid))+', '+S.d+' '+tm(S.s)+'–'+tm(S.e));save();toast('Забронировано: '+nm(pl(pid)));render()}
 function cancel(id){const b=DB.bk.find(x=>x.id==id);if(b.uid!=S.uid&&rk()<1)return toast('Недостаточно прав: чужие брони отменяет администрация',1);b.st='cancelled';audit('Отменена бронь №'+b.id+' ('+nm(pl(b.pid))+', '+b.d+')');note(b.uid,(b.uid==S.uid?'Бронь отменена: ':'Администратор отменил вашу бронь: ')+nm(pl(b.pid))+', '+fmtD(b.d));save();toast('Бронь отменена');render()}
 function sweep(){let ch=0;const n=now();DB.bk.forEach(b=>{if(b.st=='confirmed'){const a=ts(b.d,b.s);
  if(n>a+DB.cfg.ns*6e4){b.st='noshow';note(b.uid,'Бронь не подтверждена — место освобождено: '+nm(pl(b.pid))+' ('+fmtD(b.d)+', '+tm(b.s)+')');ch=1}
@@ -217,7 +232,7 @@ function vSearch(){const q=S.q,R=results(),o=(a,v)=>a.map(x=>`<option ${x==v?'se
  return`${ctrl()}<div class="card os-search-filters"><div class="os-search-filters-heading"><div><span class="os-search-filters-eyebrow">ПАРАМЕТРЫ ПОИСКА</span><h2>Подберите рабочее место</h2><p>Выберите тип пространства и необходимое оборудование</p></div><span class="os-search-filters-counter">${R.length} вариантов</span></div><div class="os-search-fields"><label for="qfloor"><span class="os-search-field-label">Этаж</span><select id="qfloor"><option value="">Все этажи</option>${[1,2,3].map(f=>`<option value="${f}" ${Number(q.floor)===f?'selected':''}>${f}-й этаж</option>`).join('')}</select></label><label for="qt"><span class="os-search-field-label">Тип места</span><select id="qt"><option value="">Все типы мест</option>${o([...new Set(P.map(p=>p.t))],q.t)}</select></label><label for="qe"><span class="os-search-field-label">Оборудование</span><select id="qe"><option value="">Любое оборудование</option>${o([...new Set(P.flatMap(p=>p.eq.map(e=>e.toLowerCase())))],q.eq)}</select></label></div></div>
  <div class="card"><h2>Подходящие варианты: ${R.length}</h2>${R.slice(0,30).map(p=>`<div class="it"><div><b>${nm(p)}</b> · этаж ${p.f} · ${p.zone}<br><small>${p.t} — ${p.eq.join(', ')}</small></div><div style="display:flex;gap:6px"><button class="btn sec" data-a="goto" data-i="${p.id}">На карте</button><button class="btn" data-a="book" data-i="${p.id}">Забронировать</button></div></div>`).join('')||'<div class="hint">Ничего не найдено — измените условия</div>'}${R.length>30?`<p class="mu">…и ещё ${R.length-30}</p>`:''}</div>`}
 function vMine(){const L=DB.bk.filter(b=>b.uid==S.uid).sort((a,b)=>ts(b.d,b.s)-ts(a.d,a.s)),up=L.filter(b=>ACT.includes(b.st)&&ts(b.d,b.e)>=now()).reverse(),hi=L.filter(b=>!up.includes(b)).slice(0,25);
- const it=(b,a)=>{const p=pl(b.pid);return`<div class="it"><div><b>${nm(p)}</b> · ${fmtD(b.d)}, ${tm(b.s)}–${tm(b.e)}<br><small>Этаж ${p.f} · ${p.zone} · ${p.eq.join(', ')}</small></div><div style="display:flex;gap:6px;align-items:center"><span class="chip ${b.st}">${SN[b.st]}</span>${a&&b.st=='confirmed'?`<button class="btn sec" data-a="qr" data-i="${b.id}">📷 QR</button><button class="btn sec" data-a="edit" data-i="${b.id}">Изменить</button><button class="btn red" data-a="cancel" data-i="${b.id}">Отменить</button>`:''}</div></div>`};
+ const it=(b,a)=>{const p=pl(b.pid);return`<div class="it"><div><b>${nm(p)}</b> · ${osBookingDateTimeText(b)}<br><small>Этаж ${p.f} · ${p.zone} · ${p.eq.join(', ')}</small></div><div style="display:flex;gap:6px;align-items:center"><span class="chip ${b.st}">${SN[b.st]}</span>${a&&b.st=='confirmed'?`<button class="btn sec" data-a="qr" data-i="${b.id}">📷 QR</button><button class="btn sec" data-a="edit" data-i="${b.id}">Изменить</button><button class="btn red" data-a="cancel" data-i="${b.id}">Отменить</button>`:''}</div></div>`};
  return`<div class="card"><h2>Предстоящие</h2>${up.map(b=>it(b,1)).join('')||'<div class="hint">Нет предстоящих броней</div>'}</div><div class="card"><h2>История</h2>${hi.map(b=>it(b,0)).join('')||'<div class="hint">Пока пусто</div>'}</div>`}
 function vAll(){
  const all=!!S.allDates,perPage=50;
@@ -235,7 +250,7 @@ function vAll(){
  </div>
  <div class="card os-all-results"><div class="os-all-results-head"><div><h2>${title}</h2><p>Найдено бронирований: <b>${list.length}</b></p></div><span class="os-all-page-counter">Страница ${S.allPage+1} из ${pages}</span></div>
  <div class="os-all-table-scroll"><table><thead><tr><th>Ресурс</th><th>Сотрудник</th>${all?'<th>Дата</th>':''}<th>Время</th><th>Статус</th><th>Действие</th></tr></thead><tbody>
- ${shown.map(b=>`<tr><td><strong>${nm(pl(b.pid)||{room:0,id:b.pid})}</strong></td><td>${uname(b.uid)}</td>${all?`<td>${fmtD(b.d)}</td>`:''}<td>${tm(b.s)}–${tm(b.e)}</td><td><span class="chip ${b.st}">${SN[b.st]||b.st}</span></td><td>${b.st==='confirmed'?`<button class="btn red" data-a="cancel" data-i="${b.id}">Отменить</button>`:'—'}</td></tr>`).join('')||`<tr><td colspan="${all?6:5}" class="os-all-empty">Бронирований пока нет</td></tr>`}
+ ${shown.map(b=>`<tr><td><strong>${nm(pl(b.pid)||{room:0,id:b.pid})}</strong></td><td>${uname(b.uid)}</td>${all?`<td>${fmtD(b.d)}</td>`:''}<td>${osBookingTimeText(b)}</td><td><span class="chip ${b.st}">${SN[b.st]||b.st}</span></td><td>${b.st==='confirmed'?`<button class="btn red" data-a="cancel" data-i="${b.id}">Отменить</button>`:'—'}</td></tr>`).join('')||`<tr><td colspan="${all?6:5}" class="os-all-empty">Бронирований пока нет</td></tr>`}
  </tbody></table></div>
  <div class="os-all-pagination"><span>Показано ${list.length?S.allPage*perPage+1:0}–${Math.min((S.allPage+1)*perPage,list.length)} из ${list.length}</span><div><button type="button" class="btn sec" data-a="all-prev" ${S.allPage===0?'disabled':''}>← Назад</button><button type="button" class="btn sec" data-a="all-next" ${S.allPage>=pages-1?'disabled':''}>Далее →</button></div></div></div>`;
 }
@@ -351,18 +366,18 @@ const ld=d=>{const s=new Set();DB.bk.forEach(b=>{if(b.d==d&&!(pl(b.pid)||{room:1
 function fixT(){if(!['map','search'].includes(S.v))return;const n=new Date(now()),td=ds(n);let nm=Math.ceil((n.getHours()*60+n.getMinutes())/15)*15;if(S.d<td)S.d=td;
  if(S.d==td&&nm>=1440){const x=new Date(n);x.setDate(x.getDate()+1);S.d=ds(x);nm=0}
  const mx=ds(new Date(now()+DB.cfg.hor*864e5));if(S.d>mx)S.d=mx;if(S.d==td&&S.s<nm)S.s=nm;
- if(S.e-S.s<DB.cfg.min)S.e=S.s+DB.cfg.min;if(S.e-S.s>960)S.e=S.s+960}
+ if(S.e-S.s<DB.cfg.min)S.e=S.s+DB.cfg.min;if(S.e-S.s>OS_BOOKING_MAX_MINUTES)S.e=S.s+OS_BOOKING_MAX_MINUTES}
 function ctrl(dateOnly){if(dateOnly)return ctrlOld(1);const n=new Date(now()),td=ds(n),nm=Math.ceil((n.getHours()*60+n.getMinutes())/15)*15,cm=S.cm||'strip',isT=S.d==td,
  days=[...Array(DB.cfg.hor+1)].map((_,i)=>{const x=new Date(n);x.setDate(x.getDate()+i);return ds(x)}),dl=d=>new Date(d+'T00:00').getDay();
  const dsel=cm=='cal'?`<div class="os-date-value"><button type="button" class="os-calendar-opener" data-picker="open" aria-haspopup="dialog" aria-label="Выбрать дату, в том числе вручную"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4M17 3v4M3 10h18M8 14h2M14 14h2"/></svg><span>${S.d.slice(8)}.${S.d.slice(5,7)}.${S.d.slice(0,4)}</span><svg class="os-calendar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><p class="os-calendar-hint">Нажмите на поле, чтобы открыть календарь или ввести дату вручную</p></div>`:cm=='list'?`<div class="os-date-value"><select id="cd" aria-label="Выберите дату">${days.map(d=>`<option value="${d}" ${d==S.d?'selected':''}>${d.slice(8)}.${d.slice(5,7)} — ${WD[dl(d)]}${d==td?' (сегодня)':''}</option>`).join('')}</select></div>`:`<div class="strip">${days.map(d=>`<button class="dc ${d==S.d?'on':''}" data-a="day" data-i="${d}"><small>${WS[dl(d)]}</small><b>${+d.slice(8)}</b><i>${ld(d)}%</i></button>`).join('')}</div>`;
  const so=[],eo=[];for(let m=isT?nm:0;m<1440;m+=15)so.push(`<option value="${m}" ${m==S.s?'selected':''}>${tm(m)}</option>`);
- for(let m=S.s+DB.cfg.min;m<=S.s+960;m+=15){const du=m-S.s;eo.push(`<option value="${m}" ${m==S.e?'selected':''}>${tm(m)}${m>=1440?' (+1 день)':''} · ${du>=60?Math.floor(du/60)+' ч'+(du%60?' '+du%60+' мин':''):du+' мин'}</option>`)}
+ for(let m=S.s+DB.cfg.min;m<=S.s+OS_BOOKING_MAX_MINUTES;m+=15){const du=m-S.s;eo.push(`<option value="${m}" ${m==S.e?'selected':''}>${tm(m)}${m>=1440?' (+1 день)':''} · ${du>=60?Math.floor(du/60)+' ч'+(du%60?' '+du%60+' мин':''):du+' мин'}</option>`)}
  const pre=[['Весь день',540,1080],['Утро',540,780],['После обеда',780,1080],['Вечер',1080,1320],['Ночь',1380,1620]];
  const durationLabel=m=>m>=60?(Math.floor(m/60)+' ч'+(m%60?' '+m%60+' мин':'')):m+' мин';
- const du=[...new Set([DB.cfg.min,30,60,120,240,480].filter(m=>m>=DB.cfg.min&&m<=960))].sort((a,b)=>a-b).map(m=>[m,durationLabel(m)]);
+ const du=[...new Set([DB.cfg.min,30,60,120,240,480].filter(m=>m>=DB.cfg.min&&m<=OS_BOOKING_MAX_MINUTES))].sort((a,b)=>a-b).map(m=>[m,durationLabel(m)]);
  return`<div class="card os-date-controls"><div class="cr"><div class="cl">Дата</div><div class="seg os-date-modes"><button class="${cm==='strip'?'on':''}" data-a="cm" data-i="strip" aria-pressed="${cm==='strip'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 9h10M7 13h7M7 16h4"/></svg><span>Лента</span></button><button class="${cm==='cal'?'on':''}" data-a="cm" data-i="cal" aria-pressed="${cm==='cal'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4M17 3v4M3 10h18M8 14h2M14 14h2M8 18h2"/></svg><span>Календарь</span></button><button class="${cm==='list'?'on':''}" data-a="cm" data-i="list" aria-pressed="${cm==='list'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 9h10M8 13h10M8 17h7"/><path d="M6 9h.01M6 13h.01M6 17h.01"/></svg><span>Список</span></button></div></div><div class="cr os-date-selection">${dsel}</div>
- <div class="cr"><div class="cl">Время</div><div class="tt"><label>Начало<select id="cs">${so.join('')}</select></label><span>→</span><label>Конец<select id="ce">${eo.join('')}</select></label><div class="sum">🕒 ${tm(S.s)}–${tm(S.e)}${S.e>1440?' (до след. дня)':''}</div></div></div>
- <div class="cr"><div class="cl">Быстрый выбор</div><div class="chs">${pre.map(p=>`<button class="ch" data-a="pre" data-i="${p[1]}-${p[2]}" ${(isT&&p[1]<nm)||(p[2]-p[1]<DB.cfg.min)?'disabled':''}>${p[0]} <small>${tm(p[1])}–${tm(p[2])}</small></button>`).join('')}${du.filter(x=>x[0]>=DB.cfg.min).map(x=>`<button class="ch" data-a="dur" data-i="${x[0]}">на ${x[1]}</button>`).join('')}</div></div>
+ <div class="cr"><div class="cl">Время</div><div class="tt"><label>Начало<select id="cs">${so.join('')}</select></label><span>→</span><label>Конец<select id="ce">${eo.join('')}</select></label><div class="sum">🕒 ${tm(S.s)}–${tm(S.e)}${S.e>=1440?' (+1 день, '+fmtD(osDatePlusDays(S.d))+')':''}</div></div></div>
+ <div class="cr"><div class="cl">Быстрый выбор</div><div class="chs">${pre.map(p=>`<button class="ch" data-a="pre" data-i="${p[1]}-${p[2]}" ${(isT&&p[1]<nm)||(p[2]-p[1]<DB.cfg.min)?'disabled':''}>${p[0]} <small>${tm(p[1])}–${tm(p[2])}${p[2]>=1440?' (+1 день)':''}</small></button>`).join('')}${du.filter(x=>x[0]>=DB.cfg.min).map(x=>`<button class="ch" data-a="dur" data-i="${x[0]}">на ${x[1]}</button>`).join('')}</div></div>
  <div class="mu" style="font-size:12px"><strong>Правила бронирования:</strong> минимум ${DB.cfg.min} мин · доступно на ${DB.cfg.hor} дн. вперёд · пересечения запрещены. Прошедшее время недоступно. Для ночной брони выберите время окончания с пометкой (+1 день).</div></div>`}
 function guide(){
  return`<div class="card floor-rest-guide"><h2>☕ Зона отдыха</h2><p>На каждом этаже есть зона отдыха. <b>Её не нужно бронировать</b> — приходите в любое время.</p><ul class="rl"><li>☕ Кофе-автомат и чайная станция</li><li>🛋 Мягкие диваны и кресла</li><li>🚰 Кулер с питьевой водой</li><li>🍽 Микроволновая печь и холодильник</li><li>📚 Стеллаж с книгами и журналами</li></ul><p class="mu" style="font-size:12px">Зона отдыха отмечена на плане этажа пунктирной рамкой.</p></div>`;
@@ -1003,22 +1018,42 @@ function osBookingDialogOpen(id,kind){
  const p=pl(b.pid);if(!p)return toast('Рабочее место не найдено',1);
  osBookingDialogClose();
  const d=document.createElement('dialog');d.id='osBookingDialog';d.className='os-block-native';
- const name=osAttr(nm(p)),date=osAttr(fmtD(b.d)),times=osAttr(tm(b.s)+'–'+tm(b.e));
+ const name=osAttr(nm(p)),date=osAttr(fmtD(b.d)),times=osAttr(osBookingTimeText(b));
  d.innerHTML=kind==='qr'?`<div class="os-native-content"><h2>Бронь №${osAttr(b.id)}</h2><p><b>${name}</b> · ${date} · ${times}</p><div style="margin:16px auto;max-width:190px;background:white;padding:10px;border-radius:12px">${qr('OS-'+p.id+'-'+b.id)}</div><p class="os-native-help">Это демонстрационный рисунок, не сканируемый QR-код. Подтверждение присутствия пока не подключено к серверу.</p><div class="os-native-actions"><button type="button" class="btn sec" id="osBookingClose">Закрыть</button></div></div>`:
- `<div class="os-native-content"><h2>Изменить время брони</h2><p><b>${name}</b> · ${date}</p><p class="os-native-help">Старая бронь будет отменена и заменена новой в одной транзакции Supabase. Если новое время недоступно, прежняя бронь сохранится.</p><div class="ctrl"><label>Начало<input id="osBookingStart" type="time" step="900" value="${tm(b.s)}"></label><label>Конец<input id="osBookingEnd" type="time" step="900" value="${tm(b.e)}"></label></div><p id="osBookingError" class="os-native-error" role="alert" hidden></p><div class="os-native-actions"><button type="button" class="btn sec" id="osBookingClose">Назад</button><button type="button" class="btn" id="osBookingSave">Сохранить</button></div></div>`;
+ `<div class="os-native-content"><h2>Изменить время брони</h2><p><b>${name}</b> · ${date}</p><p class="os-native-help">Старая бронь будет отменена и заменена новой в одной транзакции Supabase. Если новое время недоступно, прежняя бронь сохранится.</p><div class="ctrl"><label>Начало<input id="osBookingStart" type="time" step="900" value="${tm(b.s)}"></label><label>Конец<input id="osBookingEnd" type="time" step="900" value="${tm(b.e)}"></label></div><label style="display:flex;align-items:center;gap:9px;margin-top:12px;cursor:pointer"><input id="osBookingNextDay" type="checkbox" ${b.e>=1440?'checked':''} style="width:auto;flex:none;accent-color:#8b7cf4"><span>Окончание <b>на следующий день</b> (ночная бронь)</span></label><p id="osBookingTimePreview" class="os-native-help" aria-live="polite"></p><p class="os-native-help">От ${DB.cfg.min} минут до 16 часов. Время с шагом 15 минут.</p><p id="osBookingError" class="os-native-error" role="alert" hidden></p><div class="os-native-actions"><button type="button" class="btn sec" id="osBookingClose">Назад</button><button type="button" class="btn" id="osBookingSave">Сохранить</button></div></div>`;
  document.body.appendChild(d);
  d.addEventListener('close',()=>d.remove(),{once:true});
  d.addEventListener('click',e=>{if(e.target===d)osBookingDialogClose()});
  d.querySelector('#osBookingClose').addEventListener('click',osBookingDialogClose);
  const saveBtn=d.querySelector('#osBookingSave');
+ const nextDayBox=d.querySelector('#osBookingNextDay');
+ if(nextDayBox){
+  const preview=d.querySelector('#osBookingTimePreview');
+  const updatePreview=()=>{
+   const start=d.querySelector('#osBookingStart').value;
+   const end=d.querySelector('#osBookingEnd').value;
+   if(!start||!end){preview.textContent='Выберите время начала и окончания.';return}
+   const s=pm(start),e=pm(end)+(nextDayBox.checked?1440:0),duration=e-s;
+   const endDate=nextDayBox.checked?osDatePlusDays(b.d):b.d;
+   preview.textContent='Период: '+fmtD(b.d)+', '+start+' → '+fmtD(endDate)+', '+end+' · '+osBookingDurationText(duration)+(duration>OS_BOOKING_MAX_MINUTES?' (превышает 16 часов)':'');
+  };
+  [d.querySelector('#osBookingStart'),d.querySelector('#osBookingEnd'),nextDayBox].forEach(el=>{
+   el.addEventListener('input',updatePreview);
+   el.addEventListener('change',updatePreview);
+  });
+  updatePreview();
+ }
  if(saveBtn)saveBtn.addEventListener('click',async()=>{
   const start=d.querySelector('#osBookingStart').value,end=d.querySelector('#osBookingEnd').value;
   const errorEl=d.querySelector('#osBookingError');
   const fail=message=>{errorEl.textContent=message;errorEl.hidden=false};
   if(!/^\d{2}:\d{2}$/.test(start)||!/^\d{2}:\d{2}$/.test(end))return fail('Укажите начало и конец');
-  const s=pm(start),e0=pm(end),en=e0>s?e0:e0+1440;
+  const s=pm(start),e0=pm(end),en=e0+(nextDayBox?.checked?1440:0);
+  if(s<0||s>=1440||e0<0||e0>=1440||s%15||e0%15)return fail('Укажите время с шагом 15 минут');
+  if(en<=s)return fail('Конец должен быть позже начала. Если это ночная бронь, отметьте «на следующий день».');
+  if(en-s<DB.cfg.min)return fail('Минимальная длительность — '+DB.cfg.min+' минут');
+  if(en-s>OS_BOOKING_MAX_MINUTES)return fail('Максимальная длительность брони — 16 часов. Выберите более короткий интервал.');
   if(s===b.s&&en===b.e)return fail('Время не изменилось');
-  if(s<0||s>=1440||en>2880||en-s<DB.cfg.min)return fail('Проверьте время и минимальную длительность');
   saveBtn.disabled=true;saveBtn.textContent='Сохраняем…';errorEl.hidden=true;
   try{
    const {error}=await sb.rpc('office_reschedule_booking',{p_booking_id:b.id,p_start_minute:s,p_end_minute:en});
