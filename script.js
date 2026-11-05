@@ -1,4 +1,4 @@
-// ===== OfficeSpace — script.js (6.4.4: понятные ошибки бронирования) =====
+// ===== OfficeSpace 6.6 — private directory, masked bookings, sanitized Realtime =====
 // Заголовки страниц и карточка пользователя в шапке раздела
 const TT={map:['Карта офиса','Выберите дату и время, затем нажмите на свободное место'],search:['Умный поиск','Подберите место по оборудованию, зоне и числу мест рядом'],mine:['Мои бронирования','Предстоящие и прошедшие брони'],all:['Все бронирования','Просмотр и управление бронями сотрудников'],stats:['Аналитика','Загрузка офиса и ключевые показатели'],staff:['Сотрудники и права','Учётные записи, роли и матрица доступа'],sys:['Система','Параметры правил, журнал аудита и состояние'],msg:['Сообщения','Внутренние сообщения без мессенджера'],acc:['Настройки аккаунта','Профиль, контакты и пароль']};
 const pageHead=()=>{const t=TT[S.v]||TT.map,u=DB.users.find(x=>x.id==S.uid);return`<div class="ph"><div><h1>${t[0]}</h1><p>${t[1]}</p></div><div class="who"><span class="av">${u.name.split(' ').map(w=>w[0]).slice(0,2).join('')}</span><div><b>${u.name}</b><small>${RN[u.role]} · ${u.dep}</small></div></div></div>`};
@@ -250,7 +250,7 @@ function vAll(){
  </div>
  <div class="card os-all-results"><div class="os-all-results-head"><div><h2>${title}</h2><p>Найдено бронирований: <b>${list.length}</b></p></div><span class="os-all-page-counter">Страница ${S.allPage+1} из ${pages}</span></div>
  <div class="os-all-table-scroll"><table><thead><tr><th>Ресурс</th><th>Сотрудник</th>${all?'<th>Дата</th>':''}<th>Время</th><th>Статус</th><th>Действие</th></tr></thead><tbody>
- ${shown.map(b=>`<tr><td><strong>${nm(pl(b.pid)||{room:0,id:b.pid})}</strong></td><td>${uname(b.uid)}</td>${all?`<td>${fmtD(b.d)}</td>`:''}<td>${osBookingTimeText(b)}</td><td><span class="chip ${b.st}">${SN[b.st]||b.st}</span></td><td>${b.st==='confirmed'?`<button class="btn red" data-a="cancel" data-i="${b.id}">Отменить</button>`:'—'}</td></tr>`).join('')||`<tr><td colspan="${all?6:5}" class="os-all-empty">Бронирований пока нет</td></tr>`}
+ ${shown.map(b=>`<tr><td><strong>${nm(pl(b.pid)||{room:0,id:b.pid})}</strong></td><td>${uname(b.uid)}</td>${all?`<td>${fmtD(b.d)}</td>`:''}<td>${osBookingTimeText(b)}</td><td><span class="chip ${b.st}">${SN[b.st]||b.st}</span></td><td>${b.st==='confirmed'&&(b.uid===S.uid||rk()>=1)?`<button class="btn red" data-a="cancel" data-i="${b.id}">Отменить</button>`:'—'}</td></tr>`).join('')||`<tr><td colspan="${all?6:5}" class="os-all-empty">Бронирований пока нет</td></tr>`}
  </tbody></table></div>
  <div class="os-all-pagination"><span>Показано ${list.length?S.allPage*perPage+1:0}–${Math.min((S.allPage+1)*perPage,list.length)} из ${list.length}</span><div><button type="button" class="btn sec" data-a="all-prev" ${S.allPage===0?'disabled':''}>← Назад</button><button type="button" class="btn sec" data-a="all-next" ${S.allPage>=pages-1?'disabled':''}>Далее →</button></div></div></div>`;
 }
@@ -486,7 +486,7 @@ async function cloudSaveSettings(button){
 async function cloudReadAllBookings(){
  const rows=[];let offset=0;
  for(;;){
-  const {data,error}=await sb.from('bookings').select('*').order('booking_date',{ascending:false}).order('id',{ascending:false}).range(offset,offset+499);
+  const {data,error}=await sb.rpc('office_bookings_secure').range(offset,offset+499);
   if(error)throw error;
   rows.push(...(data||[]));
   if(!data||data.length<500)break;
@@ -496,7 +496,7 @@ async function cloudReadAllBookings(){
 }
 async function cloudFetch(){
  const [pr,wr,br,mr,sr,privacyResult,mutesResult,dndResult,hiddenResult,notificationsResult]=await Promise.all([
-  (async()=>{const q=await sb.from('profiles').select('id,full_name,department,phone,role,email,telegram_username,avatar_path,avatar_preset').order('full_name');if(q.error?.code==='42703'||/telegram_username/.test(q.error?.message||'')){return sb.from('profiles').select('id,full_name,department,phone,role,email').order('full_name')}return q})(),
+  sb.rpc('office_directory_secure'),
   sb.from('workplaces').select('*').eq('is_active',true).order('id'),
   cloudReadAllBookings(),
   sb.from('office_messages').select('*').order('created_at',{ascending:false}).limit(500),
@@ -544,9 +544,8 @@ async function cloudRefresh(){
 async function cloudSubscribe(){
  if(cloudChannel){await sb.removeChannel(cloudChannel);cloudChannel=null}
  cloudChannel=sb.channel('officespace-live-'+cloudUser.id)
-  .on('postgres_changes',{event:'*',schema:'public',table:'bookings'},()=>cloudRefresh())
+  .on('postgres_changes',{event:'INSERT',schema:'public',table:'office_sync_events'},()=>cloudRefresh())
   .on('postgres_changes',{event:'*',schema:'public',table:'workplaces'},()=>cloudRefresh())
-  .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},()=>cloudRefresh())
   .on('postgres_changes',{event:'UPDATE',schema:'public',table:'office_settings'},()=>cloudRefresh())
   .on('postgres_changes',{event:'*',schema:'public',table:'office_messages'},()=>cloudRefresh())
   .on('postgres_changes',{event:'INSERT',schema:'public',table:'message_hidden',filter:'user_id=eq.'+cloudUser.id},()=>osSyncHiddenMessages())
@@ -825,11 +824,11 @@ async function osCleanupOldAvatar(path){
 }
 async function osSaveAvatarPreset(index){
  const old=DB.users.find(u=>u.id===S.uid)?.avatarPath;
- if(await osSaveAvatarProfile({avatar_preset:index,avatar_path:null,updated_at:new Date().toISOString()},'Аватар сохранён в облаке'))await osCleanupOldAvatar(old);
+ if(await osSaveAvatarProfile({avatar_preset:index,avatar_path:null},'Аватар сохранён в облаке'))await osCleanupOldAvatar(old);
 }
 async function osClearAvatar(){
  const old=DB.users.find(u=>u.id===S.uid)?.avatarPath;
- if(await osSaveAvatarProfile({avatar_preset:null,avatar_path:null,updated_at:new Date().toISOString()},'Аватар удалён'))await osCleanupOldAvatar(old);
+ if(await osSaveAvatarProfile({avatar_preset:null,avatar_path:null},'Аватар удалён'))await osCleanupOldAvatar(old);
 }
 async function osUploadAvatar(file){
  if(!cloudUser)return toast('Войдите в аккаунт',1);
@@ -843,7 +842,7 @@ async function osUploadAvatar(file){
   const old=DB.users.find(u=>u.id===S.uid)?.avatarPath;
   const {error:uploadError}=await sb.storage.from(osAvatarBucket).upload(path,file,{cacheControl:'3600',upsert:false,contentType:file.type});
   if(uploadError)throw uploadError;
-  const {error:profileError}=await sb.from('profiles').update({avatar_path:path,avatar_preset:null,updated_at:new Date().toISOString()}).eq('id',cloudUser.id);
+  const {error:profileError}=await sb.from('profiles').update({avatar_path:path,avatar_preset:null}).eq('id',cloudUser.id);
   if(profileError){await sb.storage.from(osAvatarBucket).remove([path]);throw profileError}
   try{localStorage.removeItem(osLocalKey('avatar'))}catch(e){}
   await cloudFetch();render();toast('Фото сохранено в Supabase');
@@ -855,7 +854,7 @@ async function cloudSaveProfile(){
  if(!n)return toast('Введите ФИО',1);
  if(!osTelegramValid(tg))return toast('Telegram: от 5 до 32 символов, латиница, цифры и _',1);
  if(!osTelegramColumnAvailable)return toast('Для сохранения Telegram сначала выполните SQL из файла telegram_setup.sql в Supabase',1);
- const {error}=await sb.from('profiles').update({full_name:n,phone:ph,telegram_username:tg||null,updated_at:new Date().toISOString()}).eq('id',S.uid);
+ const {error}=await sb.from('profiles').update({full_name:n,phone:ph,telegram_username:tg||null}).eq('id',S.uid);
  if(error)return toast('Профиль не сохранён: '+cloudError(error),1);
  await cloudRefresh();toast('Профиль и Telegram сохранены');
 }
