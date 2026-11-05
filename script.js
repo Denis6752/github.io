@@ -475,7 +475,7 @@ async function cloudSaveSettings(button){
  osSettingsSaving=true;
  if(button){button.disabled=true;button.textContent='Сохранение…'}
  try{
-  const payload={min_duration_minutes:min,booking_horizon_days:hor,no_show_grace_minutes:ns,updated_at:new Date().toISOString()};
+  const payload={min_duration_minutes:min,booking_horizon_days:hor,no_show_grace_minutes:ns};
   const {data,error}=await sb.from('office_settings').update(payload).eq('id',1)
    .select('min_duration_minutes,booking_horizon_days,no_show_grace_minutes').single();
   if(error)throw error;
